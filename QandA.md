@@ -229,6 +229,46 @@ Kotlin / Jetpack Compose / CameraX / ML Kit Barcode Scanning / Gradle Kotlin DSL
 
 ---
 
+## クラス設計から生じた不明点（要判断）
+
+### Q18. SoundEvent の伝搬方法【重大度: 中】⏳
+
+Q9 で「ViewModel は音を直接鳴らさず、イベントを発火して UI 側で FeedbackSoundPlayer を呼ぶ」と決定した。  
+CLASS.md では `ScanViewModel` が `SharedFlow<SoundEvent>` を持つ設計にしたが、別の実装方法もある。
+
+**選択肢:**
+- A: `ScanViewModel` が `SharedFlow<SoundEvent>` を持ち、`MainActivity` が `collect` して音を鳴らす（CLASS.md の現案）
+- B: `ScanState` に `soundEvent: SoundEvent?` フィールドを追加し、StateFlow と一本化する（consumeOnce 問題あり）
+- C: `ScanScreen` / `ResultScreen` 内の `LaunchedEffect` で SoundEvent を処理する
+
+**確認事項:** A案（SharedFlow）で確定してよいか。
+
+---
+
+### Q19. BarcodeScannerController の要否【重大度: 中】⏳
+
+plan.md Task 5 に `BarcodeScannerController.kt` が登場するが、役割が `CameraPreview` Composable と重複する可能性がある。
+
+**選択肢:**
+- A: `BarcodeScannerController` を独立クラスとして作り、CameraX の起動・停止・Analyzer バインドを集約する（CLASS.md の現案）
+- B: CameraX の setup を `ScanScreen` または `CameraPreview` の `LaunchedEffect` / `DisposableEffect` 内に直接書く
+
+**確認事項:** 独立クラスにする（A案）か、Composable 内に閉じ込める（B案）か。
+
+---
+
+### Q20. FeedbackSoundPlayer のライフサイクル管理【重大度: 低】⏳
+
+`ToneGenerator` は `release()` を呼ばないとリソースリークが起きる。CLASS.md では `MainActivity.onDestroy()` で管理する設計にしたが、Compose では `DisposableEffect` を使う方法もある。
+
+**選択肢:**
+- A: `MainActivity` で `onCreate` に生成、`onDestroy` で `release()`（CLASS.md の現案）
+- B: `ScanScreen` の `DisposableEffect` で管理し、画面離脱時に解放する
+
+**確認事項:** A案（MainActivity 管理）で確定してよいか。
+
+---
+
 ## 確定した実装方針まとめ
 
 | 項目 | 値 |
