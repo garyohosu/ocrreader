@@ -22,6 +22,7 @@
 
 - 実装言語は Kotlin
 - UI は Jetpack Compose
+- 画面はポートレート固定
 - カメラは CameraX
 - バーコード認識は ML Kit Barcode Scanning
 - ビルドは Gradle Kotlin DSL
@@ -108,6 +109,7 @@ Expected: FAIL
 
 - `ScanPhase` を定義
 - 1つ目と2つ目の値を保持する
+- `errorMessage: String?` を状態に持たせる
 - 2回目で比較結果を出す
 
 **Step 4: テストを再実行する**
@@ -167,6 +169,7 @@ Expected: ビルド成功
 - カメラ権限がない場合は要求を出す
 - 拒否された場合はスタート画面にエラーを出す
 - AndroidManifest に `CAMERA` 権限を追加する
+- MainActivity に `android:screenOrientation="portrait"` を設定する
 
 **Step 2: カメラプレビューを表示する**
 
@@ -181,6 +184,8 @@ Expected: ビルド成功
 Expected:
 - カメラ映像が表示される
 - カメラ権限ダイアログが適切に出る
+- 横向きに切り替わらない
+- 画面回転で Activity 再生成や CameraX 再バインドを避けられる
 
 ---
 
@@ -201,6 +206,10 @@ Expected:
 
 - 1件以上のバーコードを受け取る
 - 空文字やnullを除外する
+- バーコード候補は検出されたが値が空文字 / null の場合は、保存せず `errorMessage` に失敗文言を設定する
+- 通常のカメラ待機状態で何も検出されていないフレームは失敗扱いにしない
+- 空文字 / null の場合は現在の読み取りフェーズを維持する
+- 空文字 / null の場合は読み取り成功音を鳴らさない
 - 先頭1件だけではなく、必要なら優先順位を持たせる
 - `Barcode.FORMAT_QR_CODE`
 - `Barcode.FORMAT_CODE_39`
@@ -232,11 +241,19 @@ Expected: PASS
 fun duplicateScanWithinCooldown_isIgnored() { ... }
 ```
 
+- 空文字を渡しても `barcode1` / `barcode2` に保存されないこと
+- null 相当の入力でもフェーズが進まないこと
+- `errorMessage` が state に設定されること
+- 空文字 / null 時に音イベントが発火しないこと
+- 次に有効なバーコードを読めたら `errorMessage` がクリアされること
+
 **Step 2: クールダウンを実装する**
 
 - 読み取り後1秒は次の検出を無効化する
 - 1つ目→2つ目の同一連続誤読を防ぐ
 - 1つ目と2つ目の同じ値そのものは禁止しない
+- 有効なバーコードを読み取った時点で `errorMessage` をクリアする
+- `reset()`、中止、スタート画面へ戻る、フェーズ切替時にも `errorMessage` をクリアする
 
 **Step 3: テストを実行する**
 
@@ -311,22 +328,36 @@ Expected:
 
 **Files:**
 - Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
+- Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
+- Modify: `project/barcodereader/android-app/app/src/main/java/.../MainActivity.kt`
 - Modify: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
 
 **Step 1: リセットテストを書く**
 
 - 判定結果、barcode1、barcode2がクリアされることを確認
+- 読み取り画面の「中止」でスタート画面へ戻ることを確認
+- 読み取り画面でシステムバックを押しても Activity を終了せず、スタート画面へ戻ることを確認
+- 判定画面でシステムバックを押しても Activity を終了せず、スタート画面へ戻ることを確認
 
 **Step 2: リセット処理を実装する**
 
 - `reset()` で読み取り状態を初期化
+- ScanScreen に「中止」ボタンを配置する
+- 「中止」押下時に `reset()` を呼び出す
+- 読み取り途中の値、判定結果、エラーメッセージをクリアする
 - スタート画面へ戻る処理を用意する
+- カメラ画面を終了し、スタート画面へ戻る
+- Jetpack Compose の `BackHandler` を使い、システムバックを画面上の戻る系操作と同じ挙動に統一する
+- 読み取り画面のシステムバックは「中止」と同じ動作にする
+- 判定画面のシステムバックは「もう一度」ではなくスタート画面へ戻す
 
 **Step 3: 再実行を確認する**
 
 Expected:
 - 連続で試せる
 - 途中で戻れる
+- 読み取り中でも安全に中止できる
+- システムバックでアプリが終了せず、状態を初期化してスタート画面へ戻る
 
 ---
 
@@ -370,12 +401,17 @@ Expected: `app-debug.apk` が生成される
 - スタートボタンを押すとカメラが起動する
 - 1つ目のバーコードを読み取れる
 - 2つ目のバーコードを読み取れる
+- 読み取り画面で「中止」ボタンを押すとスタート画面へ戻れる
+- 読み取り画面でシステムバックを押してもスタート画面へ戻れる
 - 2つのバーコード文字列を画面に表示できる
 - 一致時に青色でOK表示できる
 - 不一致時に赤色でNG表示できる
+- 空文字 / null 読み取り時は画面内メッセージを表示し、フェーズを進めない
+- 次に有効なバーコードを読めたら失敗メッセージが消える
 - 読み取り時に音が鳴る
 - 判定時にOK音またはNG音が鳴る
 - 「もう一度」ボタンで再実行できる
+- 画面はポートレート固定で動作する
 
 ---
 
