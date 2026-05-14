@@ -273,28 +273,26 @@ Kotlin / Jetpack Compose / CameraX / ML Kit Barcode Scanning / Gradle Kotlin DSL
 
 ---
 
-## テストケース設計から生じた不明点（要判断）
+## テストケース設計から生じた不明点（解決済み）
 
-### Q22. クールダウンのテスト方法【重大度: 中】⏳
+### Q22. クールダウンのテスト方法【重大度: 中】✅
 
-`ScanViewModel` のクールダウンは `viewModelScope` + `delay(1000L)` で実装する想定。  
-Unit テストで時間経過を制御するには `TestCoroutineScheduler` が必要。
+**回答:** `MainDispatcherRule` + `StandardTestDispatcher` + `advanceTimeBy()` で確定。`ScanViewModel` にコンストラクタ引数でDispatcherを渡す設計は今回不要。
 
-**確認事項:**
-- `ScanViewModel` のコンストラクタに `CoroutineDispatcher` を渡せるようにするか（テスト用に差し替え可能にする）
-- それとも `StandardTestDispatcher` / `UnconfinedTestDispatcher` の使い分けで対応するか
-- TESTCASE.md の `advanceTimeBy` の使い方で確定してよいか
+- `Dispatchers.Main` を `StandardTestDispatcher` に差し替えることで `viewModelScope` 内の `delay(1000L)` を制御できる
+- `advanceTimeBy(1001L)` → `runCurrent()` でクールダウン終了を再現する
+- ViewModel 本体にテスト都合の引数を増やさない方がシンプルでよい
 
 ---
 
-### Q23. BarcodeAnalyzer の形式フィルタリングのテスト方法【重大度: 低】⏳
+### Q23. BarcodeAnalyzer の形式フィルタリングのテスト方法【重大度: 低】✅
 
-ML Kit の `BarcodeScanner` はインターフェースではなくクラスのため、JVM Unit テストでのモック化が難しい。  
-TESTCASE.md では `isValid(value: String?)` を切り出して単体テストする方針にしている。
+**回答:** `BarcodeAnalyzer.isValid()` の単体テストは採用しない。TC-BA は削除。
 
-**確認事項:**
-- `isValid()` を `BarcodeAnalyzer` の内部関数に留めるか、テスト可能にするため `internal` または `@VisibleForTesting` を付けるか
-- バーコード形式（FORMAT_QR_CODE 等）のフィルタリングは Instrumented テストに委ねてよいか
+- null / blank の判定は `ScanViewModel.onBarcodeDetected(value: String?)` 側で行うと確定済み（Q5・CLASS.md）
+- Analyzer に `isValid()` を持たせると null/blank 判定の責務が分散し設計が崩れる
+- null / blank の期待動作は TC-VM-012〜TC-VM-016 で検証する
+- 対応形式（QR_CODE / CODE_39 / CODE_128）のフィルタリングは `BarcodeScannerOptions` で設定し、実機手動確認とする
 
 ---
 

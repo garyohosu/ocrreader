@@ -5,8 +5,9 @@
 | 種別 | 対象 | 実施有無 |
 |------|------|---------|
 | Unit テスト | ScanViewModel | ✅ 必須 |
-| Unit テスト | BarcodeAnalyzer（バリデーション部） | ✅ 必須 |
-| Unit テスト | FeedbackSoundPlayer | ⬜ 任意（ToneGenerator はモック化困難） |
+| Unit テスト | BarcodeAnalyzer | ❌ 今回対象外（ML Kit / ImageProxy 依存が強いため）|
+| Unit テスト | FeedbackSoundPlayer | ❌ 今回対象外（ToneGenerator はモック化困難） |
+| 手動確認 | QR_CODE / CODE_39 / CODE_128 読み取り | ✅ 必須 |
 | UI テスト（Compose） | 各画面 | ❌ 今回対象外（Q10）|
 | Instrumented テスト | CameraX + ML Kit 結合 | ❌ 今回対象外 |
 
@@ -108,20 +109,6 @@ stateDiagram-v2
 
 ---
 
-## TC-BA: BarcodeAnalyzer Unit テスト
-
-ML Kit の `BarcodeScanner` 自体はモック化が困難なため、  
-`BarcodeAnalyzer` 内の **バリデーション部（isValid）** を切り出して単体テスト対象とする。
-
-| ID | テスト名 | 入力 | 期待結果 |
-|----|---------|------|---------|
-| TC-BA-001 | 有効な文字列を有効と判定する | `"ABC123"` | `isValid` = true |
-| TC-BA-002 | null を無効と判定する | `null` | `isValid` = false |
-| TC-BA-003 | 空文字を無効と判定する | `""` | `isValid` = false |
-| TC-BA-004 | 空白のみの文字列を無効と判定する | `"   "` | `isValid` = false |
-
----
-
 ## TC-ST: 状態遷移の網羅テスト
 
 `ScanViewModel` の状態遷移を一覧で確認するテスト。
@@ -149,30 +136,56 @@ ML Kit の `BarcodeScanner` 自体はモック化が困難なため、
 
 ## テスト実装メモ
 
-### クールダウンのテスト方法
+### セットアップ：MainDispatcherRule
 
-`ScanViewModel` は `viewModelScope` + `delay(1000L)` でクールダウンを実装する想定。  
-Unit テストでは `TestCoroutineScheduler` / `advanceTimeBy` を使って時間を操作する。
+`ScanViewModel` は `viewModelScope` + `delay(1000L)` でクールダウンを実装する。  
+Unit テストでは `MainDispatcherRule` で `Dispatchers.Main` を `StandardTestDispatcher` に差し替え、`advanceTimeBy` で時間を操作する。  
+`ScanViewModel` 本体にテスト用 `CoroutineDispatcher` 引数は追加しない。
 
 ```kotlin
-@Test
-fun cooldown_ignoresScanWithin1Second() = runTest {
-    val vm = ScanViewModel()
-    vm.onScanStart()
-    vm.onBarcodeDetected("ABC")
-    vm.onBarcodeDetected("XYZ") // クールダウン中 → 無視
-    assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
-    assertEquals("ABC", vm.state.value.barcode1)
+@OptIn(ExperimentalCoroutinesApi::class)
+class MainDispatcherRule(
+    val testDispatcher: TestDispatcher = StandardTestDispatcher()
+) : TestWatcher() {
+    override fun starting(description: Description) {
+        Dispatchers.setMain(testDispatcher)
+    }
+    override fun finished(description: Description) {
+        Dispatchers.resetMain()
+    }
 }
+```
 
-@Test
-fun cooldown_acceptsScanAfter1Second() = runTest {
-    val vm = ScanViewModel()
-    vm.onScanStart()
-    vm.onBarcodeDetected("ABC")
-    advanceTimeBy(1001L) // 1秒経過
-    vm.onBarcodeDetected("XYZ")
-    assertEquals(ScanPhase.RESULT, vm.state.value.phase)
+### クールダウンのテスト
+
+```kotlin
+@OptIn(ExperimentalCoroutinesApi::class)
+class ScanViewModelTest {
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun cooldown_ignoresScanWithin1Second() = runTest {
+        val vm = ScanViewModel()
+        vm.onScanStart()
+        vm.onBarcodeDetected("ABC")
+        vm.onBarcodeDetected("XYZ") // クールダウン中 → 無視
+        assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
+        assertEquals("ABC", vm.state.value.barcode1)
+    }
+
+    @Test
+    fun cooldown_acceptsScanAfter1Second() = runTest {
+        val vm = ScanViewModel()
+        vm.onScanStart()
+        vm.onBarcodeDetected("ABC")
+        advanceTimeBy(1001L)
+        runCurrent()
+        vm.onBarcodeDetected("XYZ")
+        assertEquals(ScanPhase.RESULT, vm.state.value.phase)
+        assertEquals("XYZ", vm.state.value.barcode2)
+    }
 }
 ```
 
@@ -188,6 +201,7 @@ fun okScan_emitsBeepThenOk() = runTest {
     vm.onScanStart()
     vm.onBarcodeDetected("ABC")
     advanceTimeBy(1001L)
+    runCurrent()
     vm.onBarcodeDetected("ABC")
 
     assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
@@ -211,3 +225,4 @@ fun okScan_emitsBeepThenOk() = runTest {
 | 読み取り時に音が鳴る | TC-VM-017, TC-VM-018, TC-VM-019 |
 | 判定時にOK/NG音が鳴る | TC-VM-018, TC-VM-019 |
 | 「もう一度」で再実行できる | TC-VM-006 |
+| QR_CODE / CODE_39 / CODE_128 を読み取れる | 実機手動確認 |
