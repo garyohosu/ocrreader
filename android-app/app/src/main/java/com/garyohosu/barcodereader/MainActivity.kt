@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.garyohosu.barcodereader.camera.BarcodeScannerController
 import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
+import com.garyohosu.barcodereader.ui.CameraPreview
 import com.garyohosu.barcodereader.ui.ResultScreen
 import com.garyohosu.barcodereader.ui.ScanScreen
 import com.garyohosu.barcodereader.ui.StartScreen
@@ -31,6 +34,12 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val vm: ScanViewModel = viewModel()
                     val state by vm.state.collectAsStateWithLifecycle()
+
+                    val controller = remember {
+                        BarcodeScannerController(this@MainActivity) { value ->
+                            vm.onBarcodeDetected(value)
+                        }
+                    }
 
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
@@ -51,8 +60,8 @@ class MainActivity : ComponentActivity() {
                         ScanPhase.WAITING_FOR_FIRST, ScanPhase.WAITING_FOR_SECOND -> ScanScreen(
                             phase = state.phase,
                             errorMessage = state.errorMessage,
-                            onCancel = vm::onCancel
-                            // TODO: Task 4 — pass cameraContent = { CameraPreview(...) }
+                            onCancel = vm::onCancel,
+                            cameraContent = { CameraPreview(controller = controller) }
                         )
                         ScanPhase.RESULT -> ResultScreen(
                             result = state.result ?: ScanResult.NG,
