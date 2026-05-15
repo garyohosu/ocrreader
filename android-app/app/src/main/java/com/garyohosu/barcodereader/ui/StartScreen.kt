@@ -35,6 +35,7 @@ fun StartScreen(
     permissionDenied: Boolean,
     logCount: Int,
     targetCount: Int,
+    versionName: String,
     onScanStart: () -> Unit,
     onDownloadCsv: () -> Unit,
     onClearLog: () -> Unit,
@@ -165,5 +166,12 @@ fun StartScreen(
                 Text(text = "ログをクリア")
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "v$versionName",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

@@ -7,8 +7,10 @@
 | Unit テスト | ScanViewModel | ✅ 必須 |
 | Unit テスト | BarcodeAnalyzer | ❌ 今回対象外（ML Kit / ImageProxy 依存が強いため）|
 | Unit テスト | FeedbackSoundPlayer | ❌ 今回対象外（ToneGenerator はモック化困難） |
+| Unit テスト | CsvLogRepository（重複・件数） | ❌ 今回対象外（Context 依存のため Robolectric が必要） |
 | 手動確認 | 各種バーコードフォーマット読み取り | ✅ 必須 |
-| UI テスト（Compose） | 各画面 | ❌ 今回対象外（Q10）|
+| 手動確認 | 重複検出・読み込み数完了 | ✅ 必須 |
+| UI テスト（Compose） | 各画面 | ❌ 今回対象外 |
 | Instrumented テスト | CameraX + ML Kit 結合 | ❌ 今回対象外 |
 
 ---
@@ -29,8 +31,9 @@ stateDiagram-v2
     CONFIRMING_FIRST --> WAITING_FOR_SECOND : onConfirmFirst()\n「次へ」ボタン押下
     CONFIRMING_FIRST --> IDLE : onCancel()
 
-    WAITING_FOR_SECOND --> RESULT_OK : onBarcodeDetected(valid)\nbarcode1==barcode2\nBEEP→OK 発火
-    WAITING_FOR_SECOND --> RESULT_NG : onBarcodeDetected(valid)\nbarcode1!=barcode2\nBEEP→NG 発火
+    WAITING_FOR_SECOND --> RESULT_OK : onBarcodeDetected(valid)\nbarcode1==barcode2 かつ重複なし\nBEEP→OK 発火・ログ保存・件数+1
+    WAITING_FOR_SECOND --> RESULT_NG : onBarcodeDetected(valid)\nbarcode1!=barcode2\nBEEP→NG 発火（保存なし）
+    WAITING_FOR_SECOND --> RESULT_DUPLICATE : onBarcodeDetected(valid)\nbarcode1==barcode2 かつ重複あり\nBEEP→NG 発火（保存なし）
     WAITING_FOR_SECOND --> WAITING_FOR_SECOND : onBarcodeDetected(null/blank)\nerrorMessage 表示、音なし
     WAITING_FOR_SECOND --> IDLE : onCancel()
 
@@ -39,11 +42,14 @@ stateDiagram-v2
 
     RESULT_NG --> WAITING_FOR_FIRST : onRetry()\n全フィールドクリア
     RESULT_NG --> IDLE : onCancel()
+
+    RESULT_DUPLICATE --> WAITING_FOR_FIRST : onRetry()\n全フィールドクリア
+    RESULT_DUPLICATE --> IDLE : onCancel()
 ```
 
 ---
 
-## TC-VM: ScanViewModel Unit テスト
+## TC-VM: ScanViewModel Unit テスト（30件）
 
 ### 初期状態
 
@@ -59,12 +65,12 @@ stateDiagram-v2
 |----|---------|---------|------|---------|
 | TC-VM-002 | onScanStart() で WAITING_FOR_FIRST へ | `phase=IDLE` | `onScanStart()` | `phase=WAITING_FOR_FIRST` |
 | TC-VM-003 | 1つ目有効読み取りで CONFIRMING_FIRST へ | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` | `barcode1="ABC"`, `phase=CONFIRMING_FIRST` |
-| TC-VM-004 | 2つ目有効読み取りで RESULT へ（一致） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("ABC")` | `barcode2="ABC"`, `result=OK`, `phase=RESULT` |
+| TC-VM-004 | 2つ目有効読み取りで RESULT へ（一致・logRepo=null のため重複なし扱い） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("ABC")` | `barcode2="ABC"`, `result=OK`, `phase=RESULT` |
 | TC-VM-005 | 2つ目有効読み取りで RESULT へ（不一致） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("XYZ")` | `barcode2="XYZ"`, `result=NG`, `phase=RESULT` |
 | TC-VM-006 | onRetry() で WAITING_FOR_FIRST へ | `phase=RESULT`, `result=OK` | `onRetry()` | `phase=WAITING_FOR_FIRST`, `barcode1=null`, `barcode2=null`, `result=null` |
-| TC-VM-007 | onCancel() で IDLE へ（読み取り中） | `barcode1="ABC"`, `phase=CONFIRMING_FIRST` | `onCancel()` | `phase=IDLE`, `barcode1=null`, `barcode2=null`, `result=null`, `errorMessage=null` |
+| TC-VM-007 | onCancel() で IDLE へ（読み取り中） | `barcode1="ABC"`, `phase=CONFIRMING_FIRST` | `onCancel()` | `phase=IDLE`, 全フィールド null |
 | TC-VM-008 | onCancel() で IDLE へ（判定後） | `phase=RESULT`, `result=NG` | `onCancel()` | `phase=IDLE`, 全フィールド null |
-| TC-VM-011 | 同じ値を意図的に2回読める | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("SAME")` → `onConfirmFirst()` → `onBarcodeDetected("SAME")` | `result=OK` |
+| TC-VM-011 | 同じ値を意図的に2回読める（logRepo=null のため重複判定なし） | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("SAME")` → `onConfirmFirst()` → `onBarcodeDetected("SAME")` | `result=OK` |
 | TC-VM-027 | onConfirmFirst() で WAITING_FOR_SECOND へ | `phase=CONFIRMING_FIRST` | `onConfirmFirst()` | `phase=WAITING_FOR_SECOND` |
 | TC-VM-028 | onConfirmFirst() を CONFIRMING_FIRST 以外で呼んでも無視 | `phase=WAITING_FOR_FIRST` | `onConfirmFirst()` | `phase=WAITING_FOR_FIRST`（変化なし） |
 
@@ -87,8 +93,8 @@ stateDiagram-v2
 | ID | テスト名 | 前提条件 | 操作 | 期待結果 |
 |----|---------|---------|------|---------|
 | TC-VM-017 | 1つ目有効読み取りで BEEP 発火 | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` | `SoundEvent.BEEP` が emit される |
-| TC-VM-018 | OK判定で BEEP → OK の順で発火 | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("ABC")` | `SoundEvent.BEEP` → `SoundEvent.OK` の順で emit される |
-| TC-VM-019 | NG判定で BEEP → NG の順で発火 | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("XYZ")` | `SoundEvent.BEEP` → `SoundEvent.NG` の順で emit される |
+| TC-VM-018 | OK判定で BEEP → OK の順で発火 | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onConfirmFirst()` → `onBarcodeDetected("ABC")` | `[BEEP, BEEP, OK]` の順で emit |
+| TC-VM-019 | NG判定で BEEP → NG の順で発火 | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onConfirmFirst()` → `onBarcodeDetected("XYZ")` | `[BEEP, BEEP, NG]` の順で emit |
 | TC-VM-020 | null 読み取りで SoundEvent を発火しない | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected(null)` | `SoundEvent` が emit されない |
 
 ---
@@ -106,9 +112,16 @@ stateDiagram-v2
 
 ---
 
-## TC-ST: 状態遷移の網羅テスト
+### 読み込み数設定
 
-`ScanViewModel` の状態遷移を一覧で確認するテスト。
+| ID | テスト名 | 前提条件 | 操作 | 期待結果 |
+|----|---------|---------|------|---------|
+| TC-VM-029 | 初期 targetCount は 0 | — | `ScanViewModel()` 生成 | `targetCount.value == 0` |
+| TC-VM-030 | onSetTargetCount() で targetCount が更新される | `targetCount=0` | `onSetTargetCount(100)` | `targetCount.value == 100` |
+
+---
+
+## TC-ST: 状態遷移の網羅テスト
 
 | 現在フェーズ | イベント | 期待フェーズ | 備考 |
 |-------------|---------|------------|------|
@@ -122,8 +135,9 @@ stateDiagram-v2
 | CONFIRMING_FIRST | `onConfirmFirst()` | WAITING_FOR_SECOND | 「次へ」ボタン押下時 |
 | CONFIRMING_FIRST | `onCancel()` | IDLE | 全クリア |
 | CONFIRMING_FIRST | `onBarcodeDetected(valid)` | CONFIRMING_FIRST | 無視（フェーズガード） |
-| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 一致 | RESULT | result=OK |
-| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 不一致 | RESULT | result=NG |
+| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 一致・重複なし | RESULT | result=OK、ログ保存、件数+1 |
+| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 不一致 | RESULT | result=NG、保存なし |
+| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 一致・重複あり | RESULT | result=DUPLICATE、保存なし |
 | WAITING_FOR_SECOND | `onBarcodeDetected(null)` | WAITING_FOR_SECOND | errorMessage 設定 |
 | WAITING_FOR_SECOND | `onCancel()` | IDLE | 全クリア |
 | RESULT | `onRetry()` | WAITING_FOR_FIRST | 全クリア |
@@ -136,89 +150,66 @@ stateDiagram-v2
 
 ### セットアップ：MainDispatcherRule
 
-`ScanViewModel` は `viewModelScope` を使用する。Unit テストでは `MainDispatcherRule` で `Dispatchers.Main` を `StandardTestDispatcher` に差し替える。
-
 ```kotlin
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
     val testDispatcher: TestDispatcher = StandardTestDispatcher()
 ) : TestWatcher() {
-    override fun starting(description: Description) {
-        Dispatchers.setMain(testDispatcher)
-    }
-    override fun finished(description: Description) {
-        Dispatchers.resetMain()
-    }
+    override fun starting(description: Description) { Dispatchers.setMain(testDispatcher) }
+    override fun finished(description: Description) { Dispatchers.resetMain() }
 }
 ```
 
-### 2スキャンフローのテスト
+### logRepo=null 時の挙動
+
+`ScanViewModel()` を引数なしで生成すると `logRepo=null`・`settingsRepo=null` になる。
+この場合 `isDuplicate()` は呼ばれず（常に false 扱い）、`saveLog()` は何もしない。
+既存のユニットテストはすべてこの状態で動作する。
+
+### 2スキャンフロー（OK）
 
 ```kotlin
-@OptIn(ExperimentalCoroutinesApi::class)
-class ScanViewModelTest {
-
-    @get:Rule
-    val mainDispatcherRule = MainDispatcherRule()
-
-    @Test
-    fun twoScanFlow_matchOk() = runTest {
-        val vm = ScanViewModel()
-        vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        // CONFIRMING_FIRST: ユーザーが「次へ」を押す
-        vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        assertEquals(ScanResult.OK, vm.state.value.result)
-    }
-}
+vm.onScanStart(); runCurrent()
+vm.onBarcodeDetected("ABC"); runCurrent()  // → CONFIRMING_FIRST
+vm.onConfirmFirst(); runCurrent()           // → WAITING_FOR_SECOND
+vm.onBarcodeDetected("ABC"); runCurrent()  // → RESULT (OK)
+assertEquals(ScanResult.OK, vm.state.value.result)
 ```
 
 ### SoundEvent の収集方法
 
 ```kotlin
-@Test
-fun okScan_emitsBeepThenOk() = runTest {
-    val vm = ScanViewModel()
-    val events = mutableListOf<SoundEvent>()
-    val job = launch { vm.soundEvent.collect { events.add(it) } }
-
-    vm.onScanStart(); runCurrent()
-    vm.onBarcodeDetected("ABC"); runCurrent()
-    vm.onConfirmFirst(); runCurrent()
-    vm.onBarcodeDetected("ABC"); runCurrent()
-
-    assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
-    job.cancel()
-}
+val events = mutableListOf<SoundEvent>()
+val job = launch { vm.soundEvent.collect { events.add(it) } }
+// ... 操作 ...
+assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
+job.cancel()
 ```
 
 ---
 
 ## 受け入れ条件との対応
 
-| 受け入れ条件（spec.md §16） | 対応テストケース |
-|---------------------------|----------------|
-| APKでインストールできる | 手動確認（`assembleDebug`） |
+| 受け入れ条件 | 対応テストケース |
+|-------------|----------------|
+| APKでインストールできる | 手動確認 |
 | スタートボタンでカメラ起動 | 手動確認 |
-| 1つ目のバーコードを読み取れる | TC-VM-003 |
-| 1つ目読み取り後に値と「次へ」ボタンを表示 | TC-VM-003, TC-VM-027 + 手動確認 |
-| 「次へ」押下で2つ目の読み取りへ進む | TC-VM-027 |
-| 2つ目のバーコードを読み取れる | TC-VM-004, TC-VM-005 |
-| 2つの値を画面に表示できる | 手動確認（ResultScreen） |
-| 一致時に青色でOK表示 | TC-VM-004 + 手動確認 |
-| 不一致時に赤色でNG表示 | TC-VM-005 + 手動確認 |
-| 読み取り時に音が鳴る | TC-VM-017, TC-VM-018, TC-VM-019 |
-| 判定時にOK/NG音が鳴る | TC-VM-018, TC-VM-019 |
-| 「もう一度」で再実行できる | TC-VM-006 |
-| 読み取り画面で「中止」を押すとスタート画面へ戻れる | TC-VM-007 + 手動確認 |
-| 判定画面でシステムバックを押すとスタート画面へ戻れる | TC-VM-008 + 手動確認 |
-| 読み取り画面でシステムバックを押すとスタート画面へ戻れる | TC-VM-007 + 手動確認 |
-| 空文字 / null 読み取り時に画面内メッセージを表示する | TC-VM-012〜TC-VM-016 + 手動確認 |
-| 空文字 / null 読み取り時にフェーズを進めない | TC-VM-012〜TC-VM-015 |
-| 空文字 / null 読み取り時に音を鳴らさない | TC-VM-020 |
-| 次の有効読み取りで失敗メッセージが消える | TC-VM-016 |
-| 画面はポートレート固定で動作する | 手動確認 / AndroidManifest 確認 |
-| 権限拒否後、再スタートで再要求または設定案内できる | TC-VM-021, TC-VM-024, TC-VM-026 + 手動確認 |
-| 判定画面ではカメラを停止し、「もう一度」で再起動する | 手動確認 |
-| 各種バーコードフォーマットを読み取れる | 実機手動確認 |
+| 1つ目読み取り後に値と「次へ」表示 | TC-VM-003, TC-VM-027 + 手動確認 |
+| 「次へ」押下で2つ目へ進む | TC-VM-027 |
+| 一致時 OK（青）表示 | TC-VM-004 + 手動確認 |
+| 不一致時 NG（赤）表示 | TC-VM-005 + 手動確認 |
+| 重複時 重複（橙）表示・件数増やさない | 手動確認（logRepo=Context 依存） |
+| OKのみCSV保存・NGと重複は保存しない | 手動確認 |
+| 読み込み数設定・進捗 x/N 件表示 | TC-VM-029, TC-VM-030 + 手動確認 |
+| 目標完了でスタート無効・完了メッセージ | 手動確認 |
+| 読み取り時に音が鳴る | TC-VM-017〜TC-VM-019 |
+| 判定時に OK/NG 音が鳴る | TC-VM-018, TC-VM-019 |
+| OK ボタン「次のバーコードを読む」 | 手動確認 |
+| NG・重複ボタン「もう一度」 | 手動確認 |
+| 「もう一度」で再読み取りへ | TC-VM-006 |
+| 「中止」でスタート画面へ | TC-VM-007 + 手動確認 |
+| ログクリアで重複セットもリセット | 手動確認 |
+| CSVをダウンロード（共有シート） | 手動確認 |
+| バージョン表示 | 手動確認（StartScreen 下部） |
+| カメラ権限拒否後のエラー表示 | TC-VM-021, TC-VM-024, TC-VM-026 + 手動確認 |
+| 空文字/null でフェーズ維持・エラー表示 | TC-VM-012〜TC-VM-016 |

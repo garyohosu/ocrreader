@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
                             permissionDenied = state.permissionDenied,
                             logCount = logCount,
                             targetCount = targetCount,
+                            versionName = BuildConfig.VERSION_NAME,
                             onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                             onDownloadCsv = { shareCsv(logRepo) },
                             onClearLog = vm::onClearLog,

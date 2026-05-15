@@ -10,11 +10,12 @@
 | Camera | CameraX | カメラプレビュー・フレーム供給 |
 | BA | BarcodeAnalyzer (ML Kit) | バーコード検出 |
 | Sound | FeedbackSoundPlayer | 音声フィードバック |
+| Log | CsvLogRepository | CSV保存・重複チェック |
 | OS | Android OS | 権限管理 |
 
 ---
 
-## シーケンス 1: 正常フロー（OK判定）
+## シーケンス 1: 正常フロー（OK・重複なし）
 
 ```mermaid
 sequenceDiagram
@@ -24,17 +25,18 @@ sequenceDiagram
     participant Camera as CameraX
     participant BA as BarcodeAnalyzer
     participant Sound as FeedbackSoundPlayer
+    participant Log as CsvLogRepository
 
     User->>UI: アプリ起動
     UI->>VM: 初期化 (phase=IDLE)
-    UI-->>User: スタート画面を表示
+    UI-->>User: スタート画面を表示（進捗 x/N 件・バージョン表示）
 
     User->>UI: スタートボタン押下
     UI->>Camera: カメラ起動
     Camera-->>UI: プレビュー開始
     UI->>VM: onScanStart()
     VM->>VM: phase = WAITING_FOR_FIRST
-    UI-->>User: 読み取り画面「1つ目のバーコードをかざしてください」
+    UI-->>User: 読み取り画面「1本目のバーコードをかざしてください」
 
     loop 1つ目検出待ち
         Camera->>BA: フレーム供給
@@ -43,7 +45,7 @@ sequenceDiagram
 
     VM->>VM: barcode1 = value\nphase = CONFIRMING_FIRST
     VM->>Sound: playBeep()
-    Sound-->>User: ピッ（読み取り成功音）
+    Sound-->>User: ピッ
     VM-->>UI: state 更新
     UI-->>User: 「1本目を確認してください」\nbarcode1 の値と「次へ」ボタンを表示
 
@@ -51,21 +53,24 @@ sequenceDiagram
     UI->>VM: onConfirmFirst()
     VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
-    UI-->>User: 「2つ目のバーコードをかざしてください」
+    UI-->>User: 「2本目のバーコードをかざしてください」
 
     loop 2つ目検出待ち
         Camera->>BA: フレーム供給
         BA-->>VM: onBarcodeDetected(value)
     end
 
-    VM->>VM: barcode2 = value
+    VM->>VM: barcode1 == barcode2
+    VM->>Log: isDuplicate(barcode1)
+    Log-->>VM: false（未登録）
+    VM->>VM: result = OK\nphase = RESULT
     VM->>Sound: playBeep()
-    Sound-->>User: ピッ（読み取り成功音）
-    VM->>VM: barcode1 == barcode2 → OK\nphase = RESULT
     VM->>Sound: playOk()
-    Sound-->>User: OK音（TONE_PROP_ACK）
-    VM-->>UI: state 更新（result=OK）
-    UI-->>User: 判定画面（青背景・「OK」大表示）
+    Sound-->>User: ピッ → OK音
+    VM->>Log: append(datetime, barcode1, barcode2, "OK")
+    VM->>VM: logCount++
+    VM-->>UI: state 更新
+    UI-->>User: 判定画面（青・「OK」・x/N件完了・「次のバーコードを読む」）
 ```
 
 ---
@@ -79,18 +84,47 @@ sequenceDiagram
     participant VM as ScanViewModel
     participant Sound as FeedbackSoundPlayer
 
-    Note over User,Sound: 1つ目読み取りまではシーケンス1と同じ
+    Note over User,Sound: 1つ目読み取り・確認（次へ）まではシーケンス1と同じ
 
-    VM->>VM: barcode2 = value\nbarcode1 != barcode2 → NG\nphase = RESULT
+    VM->>VM: barcode1 != barcode2
+    VM->>VM: result = NG\nphase = RESULT
+    VM->>Sound: playBeep()
     VM->>Sound: playNg()
-    Sound-->>User: NG音（TONE_PROP_NACK）
+    Sound-->>User: ピッ → NG音
+    Note over VM: NGは保存しない
     VM-->>UI: state 更新（result=NG）
-    UI-->>User: 判定画面（赤背景・「NG」大表示\n1つ目: xxx / 2つ目: yyy）
+    UI-->>User: 判定画面（赤・「NG」・「もう一度」）
 ```
 
 ---
 
-## シーケンス 3: カメラ権限フロー
+## シーケンス 3: 重複検出フロー
+
+```mermaid
+sequenceDiagram
+    actor User as 作業者
+    participant UI as UI (Compose)
+    participant VM as ScanViewModel
+    participant Sound as FeedbackSoundPlayer
+    participant Log as CsvLogRepository
+
+    Note over User,Log: 1つ目読み取り・確認・2つ目読み取りまではシーケンス1と同じ
+
+    VM->>VM: barcode1 == barcode2
+    VM->>Log: isDuplicate(barcode1)
+    Log-->>VM: true（既に登録済み）
+    VM->>VM: result = DUPLICATE\nphase = RESULT
+    VM->>Sound: playBeep()
+    VM->>Sound: playNg()
+    Sound-->>User: ピッ → NG音
+    Note over VM: 重複は保存しない・件数を増やさない
+    VM-->>UI: state 更新（result=DUPLICATE）
+    UI-->>User: 判定画面（橙・「重複」・「既に読み込み済みです」・「もう一度」）
+```
+
+---
+
+## シーケンス 4: カメラ権限フロー
 
 ```mermaid
 sequenceDiagram
@@ -125,15 +159,15 @@ sequenceDiagram
             User->>OS: 拒否
             OS-->>UI: PERMISSION_DENIED
             UI->>VM: onPermissionDenied()
-            VM-->>UI: errorMessage 更新
-            UI-->>User: スタート画面にエラーメッセージ表示\n「カメラ権限が必要です。スタートボタンで再試行してください。」
+            VM-->>UI: permissionDenied=true
+            UI-->>User: スタート画面にエラーメッセージ表示
         end
     end
 ```
 
 ---
 
-## シーケンス 4: 空文字・null 読み取り時の対応
+## シーケンス 5: 空文字・null 読み取り時の対応
 
 ```mermaid
 sequenceDiagram
@@ -143,7 +177,7 @@ sequenceDiagram
     participant Camera as CameraX
     participant BA as BarcodeAnalyzer
 
-    Note over User,BA: 読み取り画面（1つ目 or 2つ目 待ち）
+    Note over User,BA: 読み取り画面（1本目 or 2本目 待ち）
 
     Camera->>BA: フレーム供給
     BA-->>VM: onBarcodeDetected("") または null
@@ -151,8 +185,6 @@ sequenceDiagram
     VM->>VM: 空文字/null を破棄\nphase 変更なし\nerrorMessage を設定
     VM-->>UI: state 更新
     UI-->>User: 「読み取りに失敗しました。もう一度バーコードをかざしてください。」
-
-    Note over User,BA: 作業者がバーコードをかざし直す
 
     Camera->>BA: フレーム供給
     BA-->>VM: onBarcodeDetected("123456")
@@ -164,7 +196,7 @@ sequenceDiagram
 
 ---
 
-## シーケンス 5: 読み取り中止フロー（「中止」ボタン / システムバック）
+## シーケンス 6: 読み取り中止フロー
 
 ```mermaid
 sequenceDiagram
@@ -173,7 +205,7 @@ sequenceDiagram
     participant VM as ScanViewModel
     participant Camera as CameraX
 
-    Note over User,Camera: 読み取り画面（1つ目 or 2つ目 待ち）
+    Note over User,Camera: 読み取り画面（1本目 or 2本目 待ち、または確認画面）
 
     alt 「中止」ボタン押下
         User->>UI: 中止ボタン押下
@@ -182,31 +214,10 @@ sequenceDiagram
     end
 
     UI->>VM: onCancel()
-    VM->>VM: barcode1 = null\nbarcode2 = null\nresult = null\nerrorMessage = null\nphase = IDLE
+    VM->>VM: 全フィールドクリア\nphase = IDLE
     VM-->>UI: state 更新
     UI->>Camera: カメラ停止
     UI-->>User: スタート画面へ遷移
-```
-
----
-
-## シーケンス 6: もう一度フロー（再試行）
-
-```mermaid
-sequenceDiagram
-    actor User as 作業者
-    participant UI as UI (Compose)
-    participant VM as ScanViewModel
-    participant Camera as CameraX
-
-    Note over User,Camera: 判定画面（OK or NG）
-
-    User->>UI: 「もう一度」ボタン押下
-    UI->>VM: onRetry()
-    VM->>VM: barcode1 = null\nbarcode2 = null\nresult = null\nerrorMessage = null\nphase = WAITING_FOR_FIRST
-    VM-->>UI: state 更新
-    UI->>Camera: カメラ再起動
-    UI-->>User: 読み取り画面「1つ目のバーコードをかざしてください」
 ```
 
 ---
@@ -239,4 +250,30 @@ sequenceDiagram
     Camera->>BA: フレーム供給（2つ目のバーコード）
     BA-->>VM: onBarcodeDetected("789012")
     VM->>VM: barcode2 = "789012"\n照合へ進む
+```
+
+---
+
+## シーケンス 8: 読み込み数完了フロー
+
+```mermaid
+sequenceDiagram
+    actor User as 作業者
+    participant UI as UI (Compose)
+    participant VM as ScanViewModel
+    participant Log as CsvLogRepository
+
+    Note over User,Log: logCount = N-1、targetCount = N の状態で最後の1件を読む
+
+    VM->>Log: append(...)
+    VM->>VM: logCount = N（= targetCount）
+    VM-->>UI: state 更新
+
+    UI-->>User: 判定画面（青・「OK」\n「読み込み終わりました。新しい読み込み数を設定してください」\n「スタート画面へ」ボタン）
+
+    User->>UI: 「スタート画面へ」押下
+    UI->>VM: onCancel()
+    VM->>VM: phase = IDLE
+    VM-->>UI: state 更新
+    UI-->>User: スタート画面（スタートボタン無効・完了メッセージ表示）
 ```

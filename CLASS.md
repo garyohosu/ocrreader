@@ -5,7 +5,8 @@
 ```
 UI層           MainActivity / StartScreen / ScanScreen / ResultScreen / CameraPreview
 ViewModel層    ScanViewModel
-Domain層       ScanState / ScanPhase / ScanResult / SoundEvent
+Domain層       ScanState / ScanPhase / ScanResult / SoundEvent / ScanLog
+Data層         CsvLogRepository / SettingsRepository
 Camera層       BarcodeScannerController / BarcodeAnalyzer
 Audio層        FeedbackSoundPlayer
 ```
@@ -30,6 +31,7 @@ classDiagram
             <<enumeration>>
             OK
             NG
+            DUPLICATE
         }
 
         class SoundEvent {
@@ -48,6 +50,32 @@ classDiagram
             +errorMessage : String?
             +permissionDenied : Boolean
         }
+
+        class ScanLog {
+            <<data class>>
+            +datetime : String
+            +barcode1 : String
+            +barcode2 : String
+            +result : String
+        }
+    }
+
+    namespace data {
+        class CsvLogRepository {
+            -file : File
+            -barcodeSetFile : File
+            -loggedBarcodes : MutableSet~String~
+            +append(log : ScanLog)
+            +isDuplicate(barcode : String) Boolean
+            +getFile() File
+            +count() Int
+            +clear()
+        }
+
+        class SettingsRepository {
+            -prefs : SharedPreferences
+            +targetCount : Int
+        }
     }
 
     namespace viewmodel {
@@ -57,12 +85,24 @@ classDiagram
             +state : StateFlow~ScanState~
             -_soundEvent : MutableSharedFlow~SoundEvent~
             +soundEvent : SharedFlow~SoundEvent~
+            -_logCount : MutableStateFlow~Int~
+            +logCount : StateFlow~Int~
+            -_targetCount : MutableStateFlow~Int~
+            +targetCount : StateFlow~Int~
             +onScanStart()
             +onBarcodeDetected(value : String?)
             +onConfirmFirst()
             +onCancel()
             +onRetry()
             +onPermissionDenied()
+            +onSetTargetCount(count : Int)
+            +onClearLog()
+            -saveLog(barcode1 : String, barcode2 : String)
+        }
+
+        class ScanViewModelFactory {
+            <<ViewModelProvider.Factory>>
+            +create(modelClass : Class) ViewModel
         }
     }
 
@@ -84,9 +124,7 @@ classDiagram
     namespace audio {
         class FeedbackSoundPlayer {
             -toneGenerator : ToneGenerator
-            +playBeep()
-            +playOk()
-            +playNg()
+            +play(event : SoundEvent)
             +release()
         }
     }
@@ -94,29 +132,41 @@ classDiagram
     namespace ui {
         class MainActivity {
             <<ComponentActivity>>
-            -viewModel : ScanViewModel
-            -soundPlayer : FeedbackSoundPlayer
             +onCreate()
-            +onDestroy()
+            -shareCsv(logRepo : CsvLogRepository)
         }
 
         class StartScreen {
             <<Composable>>
-            +state : ScanState
-            +onStartClick : () -> Unit
+            +permissionDenied : Boolean
+            +logCount : Int
+            +targetCount : Int
+            +versionName : String
+            +onScanStart : () -> Unit
+            +onDownloadCsv : () -> Unit
+            +onClearLog : () -> Unit
+            +onSetTargetCount : (Int) -> Unit
         }
 
         class ScanScreen {
             <<Composable>>
-            +state : ScanState
-            +controller : BarcodeScannerController
+            +phase : ScanPhase
+            +barcode1 : String?
+            +errorMessage : String?
             +onCancel : () -> Unit
+            +onConfirmFirst : () -> Unit
+            +cameraContent : Composable
         }
 
         class ResultScreen {
             <<Composable>>
-            +state : ScanState
+            +result : ScanResult
+            +barcode1 : String?
+            +barcode2 : String?
+            +scannedCount : Int
+            +targetCount : Int
             +onRetry : () -> Unit
+            +onCancel : () -> Unit
         }
 
         class CameraPreview {
@@ -129,9 +179,12 @@ classDiagram
     ScanState --> ScanPhase : phase
     ScanState --> ScanResult : result (nullable)
 
-    %% ViewModel ↔ Domain
+    %% ViewModel ↔ Domain / Data
     ScanViewModel ..> ScanState : emits via StateFlow
     ScanViewModel ..> SoundEvent : emits via SharedFlow
+    ScanViewModel o-- CsvLogRepository : uses (optional)
+    ScanViewModel o-- SettingsRepository : uses (optional)
+    ScanViewModelFactory ..> ScanViewModel : creates
 
     %% Camera層
     BarcodeScannerController *-- BarcodeAnalyzer : owns
@@ -143,14 +196,11 @@ classDiagram
     %% MainActivity ↔ ViewModel
     MainActivity o-- ScanViewModel : observes state
     MainActivity ..> FeedbackSoundPlayer : calls on SoundEvent
+    MainActivity ..> CsvLogRepository : creates / passes to VM
 
     %% UI ↔ ViewModel / Controller
-    StartScreen ..> ScanState : observes
-    ScanScreen ..> ScanState : observes
     ScanScreen *-- CameraPreview : contains
-    ScanScreen o-- BarcodeScannerController : uses
-    CameraPreview o-- BarcodeScannerController : uses
-    ResultScreen ..> ScanState : observes
+    ResultScreen ..> ScanResult : observes
 
     %% MainActivity → 画面
     MainActivity ..> StartScreen : renders
@@ -161,8 +211,6 @@ classDiagram
 ---
 
 ## クラス図（Domain + ViewModel 詳細）
-
-状態遷移の核となる部分を抜き出した詳細図。
 
 ```mermaid
 classDiagram
@@ -179,6 +227,7 @@ classDiagram
         <<enumeration>>
         OK
         NG
+        DUPLICATE
     }
 
     class SoundEvent {
@@ -204,12 +253,18 @@ classDiagram
         +state : StateFlow~ScanState~
         -_soundEvent : MutableSharedFlow~SoundEvent~
         +soundEvent : SharedFlow~SoundEvent~
+        -_logCount : MutableStateFlow~Int~
+        +logCount : StateFlow~Int~
+        -_targetCount : MutableStateFlow~Int~
+        +targetCount : StateFlow~Int~
         +onScanStart()
         +onBarcodeDetected(value : String?)
         +onConfirmFirst()
         +onCancel()
         +onRetry()
         +onPermissionDenied()
+        +onSetTargetCount(count : Int)
+        +onClearLog()
     }
 
     ScanState --> ScanPhase : phase
@@ -220,47 +275,43 @@ classDiagram
 
 ---
 
-## クラス図（Camera + Audio 詳細）
+## クラス図（Data 層詳細）
 
 ```mermaid
 classDiagram
-    class BarcodeAnalyzer {
-        <<ImageAnalysis.Analyzer>>
-        -onDetected : (String?) -> Unit
-        +analyze(image : ImageProxy)
+    class CsvLogRepository {
+        -file : File (scanlogs.csv)
+        -barcodeSetFile : File (logged_barcodes.txt)
+        -loggedBarcodes : MutableSet~String~
+        +append(log : ScanLog)
+        +isDuplicate(barcode : String) Boolean
+        +getFile() File
+        +count() Int
+        +clear()
     }
 
-    class BarcodeScannerController {
-        -analyzer : BarcodeAnalyzer
-        -cameraProvider : ProcessCameraProvider?
-        +startCamera(lifecycleOwner : LifecycleOwner, previewView : PreviewView)
-        +stopCamera()
+    class SettingsRepository {
+        -prefs : SharedPreferences
+        +targetCount : Int
     }
 
-    class FeedbackSoundPlayer {
-        -toneGenerator : ToneGenerator
-        +playBeep()
-        +playOk()
-        +playNg()
-        +release()
+    class ScanLog {
+        <<data class>>
+        +datetime : String
+        +barcode1 : String
+        +barcode2 : String
+        +result : String
     }
 
     class ScanViewModel {
-        <<ViewModel>>
-        +soundEvent : SharedFlow~SoundEvent~
-        +onBarcodeDetected(value : String?)
+        +onSetTargetCount(count : Int)
+        +onClearLog()
+        -saveLog(barcode1, barcode2)
     }
 
-    class MainActivity {
-        <<ComponentActivity>>
-        -soundPlayer : FeedbackSoundPlayer
-    }
-
-    BarcodeScannerController *-- BarcodeAnalyzer : owns
-    BarcodeAnalyzer ..> ScanViewModel : onBarcodeDetected() (Main thread)
-    MainActivity *-- FeedbackSoundPlayer : creates / releases
-    MainActivity ..> ScanViewModel : soundEvent を observe
-    MainActivity ..> FeedbackSoundPlayer : playBeep / playOk / playNg
+    ScanViewModel o-- CsvLogRepository : optional
+    ScanViewModel o-- SettingsRepository : optional
+    CsvLogRepository ..> ScanLog : appends
 ```
 
 ---
@@ -272,35 +323,44 @@ classDiagram
 | クラス | 種別 | 役割 |
 |--------|------|------|
 | `ScanPhase` | enum | 読み取りフェーズ（IDLE / WAITING_FOR_FIRST / CONFIRMING_FIRST / WAITING_FOR_SECOND / RESULT） |
-| `ScanResult` | enum | 照合結果（OK / NG） |
+| `ScanResult` | enum | 照合結果（OK / NG / DUPLICATE） |
 | `SoundEvent` | enum | 音イベント（BEEP / OK / NG）。ViewModel が発火し MainActivity が受け取る |
 | `ScanState` | data class | 画面全体の状態スナップショット。StateFlow で UI に流す |
+| `ScanLog` | data class | CSVへ書き出す1レコード分のデータ |
+
+### Data層
+
+| クラス | 種別 | 役割 |
+|--------|------|------|
+| `CsvLogRepository` | 通常クラス | OKログのCSV追記・重複チェック用バーコードセット管理・クリア |
+| `SettingsRepository` | 通常クラス | SharedPreferences で目標件数を永続化 |
 
 ### ViewModel層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `ScanViewModel` | ViewModel | 状態管理・照合ロジック。Android 依存を持たない |
+| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・重複判定・件数管理。logRepo/settingsRepo は省略可能（テスト時は null） |
+| `ScanViewModelFactory` | ViewModelProvider.Factory | logRepo・settingsRepo を ScanViewModel コンストラクタに渡す |
 
 ### Camera層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `BarcodeAnalyzer` | ImageAnalysis.Analyzer | ML Kit でバーコードを検出し、コールバックで ViewModel に通知する |
+| `BarcodeAnalyzer` | ImageAnalysis.Analyzer | ML Kit で全フォーマットのバーコードを検出し、コールバックで ViewModel に通知する |
 | `BarcodeScannerController` | 通常クラス | CameraX の起動・停止と BarcodeAnalyzer のバインドを担う |
 
 ### Audio層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `FeedbackSoundPlayer` | 通常クラス | ToneGenerator を内部管理し、3種の音を再生する |
+| `FeedbackSoundPlayer` | 通常クラス | ToneGenerator を内部管理し、SoundEvent に応じた音を再生する |
 
 ### UI層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `MainActivity` | ComponentActivity | ViewModel・FeedbackSoundPlayer を保持し、SoundEvent を観察して音を鳴らす |
-| `StartScreen` | Composable | スタート画面。ボタン押下で onStartClick を呼ぶ |
-| `ScanScreen` | Composable | 読み取り画面。CameraPreview を内包し、フェーズ文言を表示する |
-| `ResultScreen` | Composable | 判定画面。OK/NG 表示と「もう一度」ボタンを持つ |
+| `MainActivity` | ComponentActivity | ViewModel・FeedbackSoundPlayer・リポジトリを保持し、SoundEvent 観察・CSV 共有を担う |
+| `StartScreen` | Composable | スタート画面。進捗表示・読み込み数設定ダイアログ・ログメニュー・バージョン表示 |
+| `ScanScreen` | Composable | 読み取り画面。CameraPreview を内包し、CONFIRMING_FIRST 時に確認UIを表示 |
+| `ResultScreen` | Composable | 判定画面。OK（青）/ NG（赤）/ 重複（橙）表示と進捗・完了メッセージ |
 | `CameraPreview` | Composable | CameraX のプレビューを AndroidView でラップして表示する |
