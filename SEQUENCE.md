@@ -41,9 +41,15 @@ sequenceDiagram
         BA-->>VM: onBarcodeDetected(value)
     end
 
-    VM->>VM: barcode1 = value\nクールダウン開始（1秒）\nphase = WAITING_FOR_SECOND
+    VM->>VM: barcode1 = value\nphase = CONFIRMING_FIRST
     VM->>Sound: playBeep()
     Sound-->>User: ピッ（読み取り成功音）
+    VM-->>UI: state 更新
+    UI-->>User: 「1本目を確認してください」\nbarcode1 の値と「次へ」ボタンを表示
+
+    User->>UI: 「次へ」ボタン押下
+    UI->>VM: onConfirmFirst()
+    VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
     UI-->>User: 「2つ目のバーコードをかざしてください」
 
@@ -52,7 +58,7 @@ sequenceDiagram
         BA-->>VM: onBarcodeDetected(value)
     end
 
-    VM->>VM: barcode2 = value\nクールダウン開始（1秒）
+    VM->>VM: barcode2 = value
     VM->>Sound: playBeep()
     Sound-->>User: ピッ（読み取り成功音）
     VM->>VM: barcode1 == barcode2 → OK\nphase = RESULT
@@ -205,26 +211,30 @@ sequenceDiagram
 
 ---
 
-## シーケンス 7: クールダウン中の誤検出を無視するフロー
+## シーケンス 7: 1本目確認フロー（CONFIRMING_FIRST）
 
 ```mermaid
 sequenceDiagram
     actor User as 作業者
+    participant UI as UI (Compose)
     participant VM as ScanViewModel
     participant Camera as CameraX
     participant BA as BarcodeAnalyzer
 
     Camera->>BA: フレーム供給
     BA-->>VM: onBarcodeDetected("123456")
-    VM->>VM: barcode1 = "123456"\nクールダウン開始（1秒）
+    VM->>VM: barcode1 = "123456"\nphase = CONFIRMING_FIRST
+    VM-->>UI: state 更新
 
-    Note over VM: クールダウン中（1秒以内）
+    Note over UI,User: カメラ映像 + barcode1 の値 + 「次へ」ボタンを表示
 
-    Camera->>BA: フレーム供給（同じバーコードが映り続ける）
-    BA-->>VM: onBarcodeDetected("123456")
-    VM->>VM: クールダウン中のため無視
+    Note over Camera,BA: カメラフレームは引き続き供給されるが\nCONFIRMING_FIRST 中は VM が無視する
 
-    Note over VM: 1秒経過後、クールダウン終了
+    User->>UI: 「次へ」ボタン押下
+    UI->>VM: onConfirmFirst()
+    VM->>VM: phase = WAITING_FOR_SECOND
+    VM-->>UI: state 更新
+    UI-->>User: 「2本目のバーコードをかざしてください」
 
     Camera->>BA: フレーム供給（2つ目のバーコード）
     BA-->>VM: onBarcodeDetected("789012")

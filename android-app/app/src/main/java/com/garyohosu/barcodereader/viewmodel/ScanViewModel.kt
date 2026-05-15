@@ -6,7 +6,6 @@ import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
 import com.garyohosu.barcodereader.domain.ScanState
 import com.garyohosu.barcodereader.domain.SoundEvent
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-private const val COOLDOWN_MS = 1000L
 private const val ERROR_EMPTY = "読み取りに失敗しました。もう一度バーコードをかざしてください。"
 
 class ScanViewModel : ViewModel() {
@@ -26,8 +24,6 @@ class ScanViewModel : ViewModel() {
     private val _soundEvent = MutableSharedFlow<SoundEvent>()
     val soundEvent: SharedFlow<SoundEvent> = _soundEvent.asSharedFlow()
 
-    private var cooldownActive = false
-
     fun onScanStart() {
         _state.value = ScanState(phase = ScanPhase.WAITING_FOR_FIRST)
     }
@@ -35,24 +31,17 @@ class ScanViewModel : ViewModel() {
     fun onBarcodeDetected(value: String?) {
         val phase = _state.value.phase
         if (phase != ScanPhase.WAITING_FOR_FIRST && phase != ScanPhase.WAITING_FOR_SECOND) return
-        if (cooldownActive) return
 
         if (value.isNullOrBlank()) {
             _state.value = _state.value.copy(errorMessage = ERROR_EMPTY)
             return
         }
 
-        cooldownActive = true
-        viewModelScope.launch {
-            delay(COOLDOWN_MS)
-            cooldownActive = false
-        }
-
         when (phase) {
             ScanPhase.WAITING_FOR_FIRST -> {
                 _state.value = _state.value.copy(
                     barcode1 = value,
-                    phase = ScanPhase.WAITING_FOR_SECOND,
+                    phase = ScanPhase.CONFIRMING_FIRST,
                     errorMessage = null
                 )
                 emitSound(SoundEvent.BEEP)
@@ -72,13 +61,16 @@ class ScanViewModel : ViewModel() {
         }
     }
 
+    fun onConfirmFirst() {
+        if (_state.value.phase != ScanPhase.CONFIRMING_FIRST) return
+        _state.value = _state.value.copy(phase = ScanPhase.WAITING_FOR_SECOND)
+    }
+
     fun onCancel() {
-        cooldownActive = false
         _state.value = ScanState()
     }
 
     fun onRetry() {
-        cooldownActive = false
         _state.value = ScanState(phase = ScanPhase.WAITING_FOR_FIRST)
     }
 

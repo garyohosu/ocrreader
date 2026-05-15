@@ -65,10 +65,14 @@ class MainActivity : ComponentActivity() {
                             permissionDenied = state.permissionDenied,
                             onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) }
                         )
-                        ScanPhase.WAITING_FOR_FIRST, ScanPhase.WAITING_FOR_SECOND -> ScanScreen(
+                        ScanPhase.WAITING_FOR_FIRST,
+                        ScanPhase.CONFIRMING_FIRST,
+                        ScanPhase.WAITING_FOR_SECOND -> ScanScreen(
                             phase = state.phase,
+                            barcode1 = state.barcode1,
                             errorMessage = state.errorMessage,
                             onCancel = vm::onCancel,
+                            onConfirmFirst = vm::onConfirmFirst,
                             cameraContent = { CameraPreview(controller = controller) }
                         )
                         ScanPhase.RESULT -> ResultScreen(

@@ -7,7 +7,7 @@
 | Unit テスト | ScanViewModel | ✅ 必須 |
 | Unit テスト | BarcodeAnalyzer | ❌ 今回対象外（ML Kit / ImageProxy 依存が強いため）|
 | Unit テスト | FeedbackSoundPlayer | ❌ 今回対象外（ToneGenerator はモック化困難） |
-| 手動確認 | QR_CODE / CODE_39 / CODE_128 読み取り | ✅ 必須 |
+| 手動確認 | 各種バーコードフォーマット読み取り | ✅ 必須 |
 | UI テスト（Compose） | 各画面 | ❌ 今回対象外（Q10）|
 | Instrumented テスト | CameraX + ML Kit 結合 | ❌ 今回対象外 |
 
@@ -22,14 +22,16 @@ stateDiagram-v2
     IDLE --> WAITING_FOR_FIRST : onScanStart()
     IDLE --> IDLE : onPermissionDenied()\npermissionDenied=true
 
-    WAITING_FOR_FIRST --> WAITING_FOR_SECOND : onBarcodeDetected(valid)\nbarcode1 保存、BEEP 発火
+    WAITING_FOR_FIRST --> CONFIRMING_FIRST : onBarcodeDetected(valid)\nbarcode1 保存、BEEP 発火
     WAITING_FOR_FIRST --> WAITING_FOR_FIRST : onBarcodeDetected(null/blank)\nerrorMessage 表示、音なし
     WAITING_FOR_FIRST --> IDLE : onCancel()
+
+    CONFIRMING_FIRST --> WAITING_FOR_SECOND : onConfirmFirst()\n「次へ」ボタン押下
+    CONFIRMING_FIRST --> IDLE : onCancel()
 
     WAITING_FOR_SECOND --> RESULT_OK : onBarcodeDetected(valid)\nbarcode1==barcode2\nBEEP→OK 発火
     WAITING_FOR_SECOND --> RESULT_NG : onBarcodeDetected(valid)\nbarcode1!=barcode2\nBEEP→NG 発火
     WAITING_FOR_SECOND --> WAITING_FOR_SECOND : onBarcodeDetected(null/blank)\nerrorMessage 表示、音なし
-    WAITING_FOR_SECOND --> WAITING_FOR_SECOND : onBarcodeDetected(valid) クールダウン中\n1つ目直後の誤検出を無視
     WAITING_FOR_SECOND --> IDLE : onCancel()
 
     RESULT_OK --> WAITING_FOR_FIRST : onRetry()\n全フィールドクリア
@@ -56,22 +58,15 @@ stateDiagram-v2
 | ID | テスト名 | 前提条件 | 操作 | 期待結果 |
 |----|---------|---------|------|---------|
 | TC-VM-002 | onScanStart() で WAITING_FOR_FIRST へ | `phase=IDLE` | `onScanStart()` | `phase=WAITING_FOR_FIRST` |
-| TC-VM-003 | 1つ目有効読み取りで WAITING_FOR_SECOND へ | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` |
+| TC-VM-003 | 1つ目有効読み取りで CONFIRMING_FIRST へ | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` | `barcode1="ABC"`, `phase=CONFIRMING_FIRST` |
 | TC-VM-004 | 2つ目有効読み取りで RESULT へ（一致） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("ABC")` | `barcode2="ABC"`, `result=OK`, `phase=RESULT` |
 | TC-VM-005 | 2つ目有効読み取りで RESULT へ（不一致） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onBarcodeDetected("XYZ")` | `barcode2="XYZ"`, `result=NG`, `phase=RESULT` |
 | TC-VM-006 | onRetry() で WAITING_FOR_FIRST へ | `phase=RESULT`, `result=OK` | `onRetry()` | `phase=WAITING_FOR_FIRST`, `barcode1=null`, `barcode2=null`, `result=null` |
-| TC-VM-007 | onCancel() で IDLE へ（読み取り中） | `barcode1="ABC"`, `phase=WAITING_FOR_SECOND` | `onCancel()` | `phase=IDLE`, `barcode1=null`, `barcode2=null`, `result=null`, `errorMessage=null` |
+| TC-VM-007 | onCancel() で IDLE へ（読み取り中） | `barcode1="ABC"`, `phase=CONFIRMING_FIRST` | `onCancel()` | `phase=IDLE`, `barcode1=null`, `barcode2=null`, `result=null`, `errorMessage=null` |
 | TC-VM-008 | onCancel() で IDLE へ（判定後） | `phase=RESULT`, `result=NG` | `onCancel()` | `phase=IDLE`, 全フィールド null |
-
----
-
-### クールダウン
-
-| ID | テスト名 | 前提条件 | 操作 | 期待結果 |
-|----|---------|---------|------|---------|
-| TC-VM-009 | 1つ目読み取り直後のクールダウン中は2つ目候補を無視 | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` → 即 `onBarcodeDetected("XYZ")` | `barcode1="ABC"`, `barcode2=null`, `phase=WAITING_FOR_SECOND` |
-| TC-VM-010 | クールダウン終了後は読み取り可 | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("ABC")` → 1秒後 `onBarcodeDetected("XYZ")` | `barcode2="XYZ"`, `phase=RESULT` |
-| TC-VM-011 | 同じ値を意図的に2回読める（クールダウン後） | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("SAME")` → 1秒後 `onBarcodeDetected("SAME")` | `result=OK` |
+| TC-VM-011 | 同じ値を意図的に2回読める | `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("SAME")` → `onConfirmFirst()` → `onBarcodeDetected("SAME")` | `result=OK` |
+| TC-VM-027 | onConfirmFirst() で WAITING_FOR_SECOND へ | `phase=CONFIRMING_FIRST` | `onConfirmFirst()` | `phase=WAITING_FOR_SECOND` |
+| TC-VM-028 | onConfirmFirst() を CONFIRMING_FIRST 以外で呼んでも無視 | `phase=WAITING_FOR_FIRST` | `onConfirmFirst()` | `phase=WAITING_FOR_FIRST`（変化なし） |
 
 ---
 
@@ -121,13 +116,15 @@ stateDiagram-v2
 | IDLE | `onBarcodeDetected(valid)` | IDLE | 無視 |
 | IDLE | `onCancel()` | IDLE | 変化なし |
 | IDLE | `onPermissionDenied()` | IDLE | permissionDenied=true |
-| WAITING_FOR_FIRST | `onBarcodeDetected(valid)` | WAITING_FOR_SECOND | barcode1 保存 |
+| WAITING_FOR_FIRST | `onBarcodeDetected(valid)` | CONFIRMING_FIRST | barcode1 保存、BEEP 発火 |
 | WAITING_FOR_FIRST | `onBarcodeDetected(null)` | WAITING_FOR_FIRST | errorMessage 設定 |
 | WAITING_FOR_FIRST | `onCancel()` | IDLE | 全クリア |
+| CONFIRMING_FIRST | `onConfirmFirst()` | WAITING_FOR_SECOND | 「次へ」ボタン押下時 |
+| CONFIRMING_FIRST | `onCancel()` | IDLE | 全クリア |
+| CONFIRMING_FIRST | `onBarcodeDetected(valid)` | CONFIRMING_FIRST | 無視（フェーズガード） |
 | WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 一致 | RESULT | result=OK |
 | WAITING_FOR_SECOND | `onBarcodeDetected(valid)` 不一致 | RESULT | result=NG |
 | WAITING_FOR_SECOND | `onBarcodeDetected(null)` | WAITING_FOR_SECOND | errorMessage 設定 |
-| WAITING_FOR_SECOND | `onBarcodeDetected(valid)` クールダウン中 | WAITING_FOR_SECOND | 1つ目読み取り直後の誤検出を無視 |
 | WAITING_FOR_SECOND | `onCancel()` | IDLE | 全クリア |
 | RESULT | `onRetry()` | WAITING_FOR_FIRST | 全クリア |
 | RESULT | `onCancel()` | IDLE | 全クリア |
@@ -139,9 +136,7 @@ stateDiagram-v2
 
 ### セットアップ：MainDispatcherRule
 
-`ScanViewModel` は `viewModelScope` + `delay(1000L)` でクールダウンを実装する。  
-Unit テストでは `MainDispatcherRule` で `Dispatchers.Main` を `StandardTestDispatcher` に差し替え、`advanceTimeBy` で時間を操作する。  
-`ScanViewModel` 本体にテスト用 `CoroutineDispatcher` 引数は追加しない。
+`ScanViewModel` は `viewModelScope` を使用する。Unit テストでは `MainDispatcherRule` で `Dispatchers.Main` を `StandardTestDispatcher` に差し替える。
 
 ```kotlin
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -157,7 +152,7 @@ class MainDispatcherRule(
 }
 ```
 
-### クールダウンのテスト
+### 2スキャンフローのテスト
 
 ```kotlin
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -167,25 +162,14 @@ class ScanViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun cooldown_ignoresScanWithin1Second() = runTest {
+    fun twoScanFlow_matchOk() = runTest {
         val vm = ScanViewModel()
-        vm.onScanStart()
-        vm.onBarcodeDetected("ABC")
-        vm.onBarcodeDetected("XYZ") // クールダウン中 → 無視
-        assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
-        assertEquals("ABC", vm.state.value.barcode1)
-    }
-
-    @Test
-    fun cooldown_acceptsScanAfter1Second() = runTest {
-        val vm = ScanViewModel()
-        vm.onScanStart()
-        vm.onBarcodeDetected("ABC")
-        advanceTimeBy(1001L)
-        runCurrent()
-        vm.onBarcodeDetected("XYZ")
-        assertEquals(ScanPhase.RESULT, vm.state.value.phase)
-        assertEquals("XYZ", vm.state.value.barcode2)
+        vm.onScanStart(); runCurrent()
+        vm.onBarcodeDetected("ABC"); runCurrent()
+        // CONFIRMING_FIRST: ユーザーが「次へ」を押す
+        vm.onConfirmFirst(); runCurrent()
+        vm.onBarcodeDetected("ABC"); runCurrent()
+        assertEquals(ScanResult.OK, vm.state.value.result)
     }
 }
 ```
@@ -199,11 +183,10 @@ fun okScan_emitsBeepThenOk() = runTest {
     val events = mutableListOf<SoundEvent>()
     val job = launch { vm.soundEvent.collect { events.add(it) } }
 
-    vm.onScanStart()
-    vm.onBarcodeDetected("ABC")
-    advanceTimeBy(1001L)
-    runCurrent()
-    vm.onBarcodeDetected("ABC")
+    vm.onScanStart(); runCurrent()
+    vm.onBarcodeDetected("ABC"); runCurrent()
+    vm.onConfirmFirst(); runCurrent()
+    vm.onBarcodeDetected("ABC"); runCurrent()
 
     assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
     job.cancel()
@@ -219,6 +202,8 @@ fun okScan_emitsBeepThenOk() = runTest {
 | APKでインストールできる | 手動確認（`assembleDebug`） |
 | スタートボタンでカメラ起動 | 手動確認 |
 | 1つ目のバーコードを読み取れる | TC-VM-003 |
+| 1つ目読み取り後に値と「次へ」ボタンを表示 | TC-VM-003, TC-VM-027 + 手動確認 |
+| 「次へ」押下で2つ目の読み取りへ進む | TC-VM-027 |
 | 2つ目のバーコードを読み取れる | TC-VM-004, TC-VM-005 |
 | 2つの値を画面に表示できる | 手動確認（ResultScreen） |
 | 一致時に青色でOK表示 | TC-VM-004 + 手動確認 |
@@ -236,4 +221,4 @@ fun okScan_emitsBeepThenOk() = runTest {
 | 画面はポートレート固定で動作する | 手動確認 / AndroidManifest 確認 |
 | 権限拒否後、再スタートで再要求または設定案内できる | TC-VM-021, TC-VM-024, TC-VM-026 + 手動確認 |
 | 判定画面ではカメラを停止し、「もう一度」で再起動する | 手動確認 |
-| QR_CODE / CODE_39 / CODE_128 を読み取れる | 実機手動確認 |
+| 各種バーコードフォーマットを読み取れる | 実機手動確認 |

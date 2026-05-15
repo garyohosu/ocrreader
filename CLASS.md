@@ -21,6 +21,7 @@ classDiagram
             <<enumeration>>
             IDLE
             WAITING_FOR_FIRST
+            CONFIRMING_FIRST
             WAITING_FOR_SECOND
             RESULT
         }
@@ -56,15 +57,12 @@ classDiagram
             +state : StateFlow~ScanState~
             -_soundEvent : MutableSharedFlow~SoundEvent~
             +soundEvent : SharedFlow~SoundEvent~
-            -cooldownActive : Boolean
             +onScanStart()
             +onBarcodeDetected(value : String?)
+            +onConfirmFirst()
             +onCancel()
             +onRetry()
             +onPermissionDenied()
-            -compare() ScanResult
-            -startCooldown()
-            -reset()
         }
     }
 
@@ -172,6 +170,7 @@ classDiagram
         <<enumeration>>
         IDLE
         WAITING_FOR_FIRST
+        CONFIRMING_FIRST
         WAITING_FOR_SECOND
         RESULT
     }
@@ -205,15 +204,12 @@ classDiagram
         +state : StateFlow~ScanState~
         -_soundEvent : MutableSharedFlow~SoundEvent~
         +soundEvent : SharedFlow~SoundEvent~
-        -cooldownActive : Boolean
         +onScanStart()
         +onBarcodeDetected(value : String?)
+        +onConfirmFirst()
         +onCancel()
         +onRetry()
         +onPermissionDenied()
-        -compare() ScanResult
-        -startCooldown()
-        -reset()
     }
 
     ScanState --> ScanPhase : phase
@@ -275,7 +271,7 @@ classDiagram
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `ScanPhase` | enum | 読み取りフェーズ（IDLE / WAITING_FOR_FIRST / WAITING_FOR_SECOND / RESULT） |
+| `ScanPhase` | enum | 読み取りフェーズ（IDLE / WAITING_FOR_FIRST / CONFIRMING_FIRST / WAITING_FOR_SECOND / RESULT） |
 | `ScanResult` | enum | 照合結果（OK / NG） |
 | `SoundEvent` | enum | 音イベント（BEEP / OK / NG）。ViewModel が発火し MainActivity が受け取る |
 | `ScanState` | data class | 画面全体の状態スナップショット。StateFlow で UI に流す |
@@ -284,7 +280,7 @@ classDiagram
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・クールダウン制御。Android 依存を持たない |
+| `ScanViewModel` | ViewModel | 状態管理・照合ロジック。Android 依存を持たない |
 
 ### Camera層
 

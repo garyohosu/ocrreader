@@ -6,7 +6,6 @@ import com.garyohosu.barcodereader.domain.SoundEvent
 import com.garyohosu.barcodereader.viewmodel.ScanViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -48,12 +47,12 @@ class ScanViewModelTest {
     }
 
     @Test
-    fun tc_vm_003_firstValidScan_savesBarcode1AndMovesToSecond() = runTest {
+    fun tc_vm_003_firstValidScan_savesBarcode1AndMovesToConfirmingFirst() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
         assertEquals("ABC", vm.state.value.barcode1)
-        assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
+        assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
     }
 
     @Test
@@ -61,7 +60,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
         assertEquals("ABC", vm.state.value.barcode2)
         assertEquals(ScanResult.OK, vm.state.value.result)
@@ -73,7 +72,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("XYZ"); runCurrent()
         assertEquals("XYZ", vm.state.value.barcode2)
         assertEquals(ScanResult.NG, vm.state.value.result)
@@ -85,7 +84,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
         vm.onRetry(); runCurrent()
         val s = vm.state.value
@@ -113,43 +112,19 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("XYZ"); runCurrent()
         vm.onCancel(); runCurrent()
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
         assertNull(vm.state.value.result)
     }
 
-    // ── クールダウン ────────────────────────────────────────────
-
     @Test
-    fun tc_vm_009_cooldown_ignoresScanWithin1Second() = runTest {
-        val vm = ScanViewModel()
-        vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        vm.onBarcodeDetected("XYZ"); runCurrent() // クールダウン中 → 無視
-        assertEquals("ABC", vm.state.value.barcode1)
-        assertNull(vm.state.value.barcode2)
-        assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
-    }
-
-    @Test
-    fun tc_vm_010_cooldown_acceptsScanAfter1Second() = runTest {
-        val vm = ScanViewModel()
-        vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
-        vm.onBarcodeDetected("XYZ"); runCurrent()
-        assertEquals("XYZ", vm.state.value.barcode2)
-        assertEquals(ScanPhase.RESULT, vm.state.value.phase)
-    }
-
-    @Test
-    fun tc_vm_011_sameValueTwiceAfterCooldown_isOk() = runTest {
+    fun tc_vm_011_sameValueTwice_isOk() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("SAME"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("SAME"); runCurrent()
         assertEquals(ScanResult.OK, vm.state.value.result)
     }
@@ -191,7 +166,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected(null); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
         assertNull(vm.state.value.barcode2)
@@ -228,7 +203,7 @@ class ScanViewModelTest {
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
         job.cancel()
@@ -241,7 +216,7 @@ class ScanViewModelTest {
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("XYZ"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.NG), events)
         job.cancel()
@@ -281,7 +256,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
-        advanceTimeBy(1001L); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
         vm.onBarcodeDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
         vm.onBarcodeDetected("NEW"); runCurrent()
@@ -315,5 +290,23 @@ class ScanViewModelTest {
         vm.onPermissionDenied(); runCurrent()
         assertTrue(vm.state.value.permissionDenied)
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
+    }
+
+    @Test
+    fun tc_vm_027_onConfirmFirst_movesToWaitingForSecond() = runTest {
+        val vm = ScanViewModel()
+        vm.onScanStart(); runCurrent()
+        vm.onBarcodeDetected("ABC"); runCurrent()
+        assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
+        vm.onConfirmFirst(); runCurrent()
+        assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
+    }
+
+    @Test
+    fun tc_vm_028_onConfirmFirst_fromOtherPhase_isIgnored() = runTest {
+        val vm = ScanViewModel()
+        vm.onScanStart(); runCurrent()
+        vm.onConfirmFirst(); runCurrent()
+        assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
     }
 }

@@ -26,14 +26,17 @@ import com.garyohosu.barcodereader.domain.ScanPhase
 @Composable
 fun ScanScreen(
     phase: ScanPhase,
+    barcode1: String?,
     errorMessage: String?,
     onCancel: () -> Unit,
+    onConfirmFirst: () -> Unit,
     cameraContent: @Composable () -> Unit = {}
 ) {
     BackHandler(onBack = onCancel)
 
     val phaseMessage = when (phase) {
         ScanPhase.WAITING_FOR_FIRST -> "1本目のバーコードをかざしてください"
+        ScanPhase.CONFIRMING_FIRST -> "1本目を確認してください"
         ScanPhase.WAITING_FOR_SECOND -> "2本目のバーコードをかざしてください"
         else -> ""
     }
@@ -77,7 +80,24 @@ fun ScanScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (phase == ScanPhase.CONFIRMING_FIRST) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = barcode1 ?: "",
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onConfirmFirst) {
+                Text(text = "次へ")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        } else {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
 
         Button(
             onClick = onCancel,
