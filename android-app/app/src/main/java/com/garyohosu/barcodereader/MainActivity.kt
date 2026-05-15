@@ -1,6 +1,7 @@
 package com.garyohosu.barcodereader
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -14,10 +15,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.garyohosu.barcodereader.audio.FeedbackSoundPlayer
 import com.garyohosu.barcodereader.camera.BarcodeScannerController
+import com.garyohosu.barcodereader.data.CsvLogRepository
 import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
 import com.garyohosu.barcodereader.ui.CameraPreview
@@ -26,6 +29,7 @@ import com.garyohosu.barcodereader.ui.ScanScreen
 import com.garyohosu.barcodereader.ui.StartScreen
 import com.garyohosu.barcodereader.ui.theme.BarcodeReaderTheme
 import com.garyohosu.barcodereader.viewmodel.ScanViewModel
+import com.garyohosu.barcodereader.viewmodel.ScanViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,8 +38,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             BarcodeReaderTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val vm: ScanViewModel = viewModel()
+                    val logRepo = remember { CsvLogRepository(this@MainActivity) }
+                    val vm: ScanViewModel = viewModel(factory = ScanViewModelFactory(logRepo))
                     val state by vm.state.collectAsStateWithLifecycle()
+                    val logCount by vm.logCount.collectAsStateWithLifecycle()
 
                     val controller = remember {
                         BarcodeScannerController(this@MainActivity) { value ->
@@ -63,7 +69,10 @@ class MainActivity : ComponentActivity() {
                     when (state.phase) {
                         ScanPhase.IDLE -> StartScreen(
                             permissionDenied = state.permissionDenied,
-                            onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) }
+                            logCount = logCount,
+                            onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                            onDownloadCsv = { shareCsv(logRepo) },
+                            onClearLog = vm::onClearLog
                         )
                         ScanPhase.WAITING_FOR_FIRST,
                         ScanPhase.CONFIRMING_FIRST,
@@ -86,5 +95,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun shareCsv(logRepo: CsvLogRepository) {
+        val file = logRepo.getFile()
+        if (!file.exists()) return
+        val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "バーコード照合ログ")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "CSVを共有"))
     }
 }
