@@ -75,7 +75,8 @@ class MainActivity : ComponentActivity() {
                             result = state.result ?: ScanResult.NG,
                             barcode1 = state.barcode1,
                             barcode2 = state.barcode2,
-                            onRetry = vm::onRetry
+                            onRetry = vm::onRetry,
+                            onCancel = vm::onCancel
                         )
                     }
                 }

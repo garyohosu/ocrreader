@@ -31,9 +31,11 @@ fun ResultScreen(
     result: ScanResult,
     barcode1: String?,
     barcode2: String?,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onCancel: () -> Unit
 ) {
-    BackHandler(onBack = onRetry)
+    // システムバックはスタート画面へ戻す（「もう一度」とは別動作）
+    BackHandler(onBack = onCancel)
 
     val bgColor = if (result == ScanResult.OK) OK_COLOR else NG_COLOR
     val resultText = if (result == ScanResult.OK) "OK" else "NG"
