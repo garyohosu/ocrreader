@@ -9,12 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.garyohosu.barcodereader.audio.FeedbackSoundPlayer
 import com.garyohosu.barcodereader.camera.BarcodeScannerController
 import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
@@ -41,15 +43,21 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    val soundPlayer = remember { FeedbackSoundPlayer() }
+                    DisposableEffect(Unit) {
+                        onDispose { soundPlayer.release() }
+                    }
+
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestPermission()
                     ) { granted ->
                         if (granted) vm.onScanStart() else vm.onPermissionDenied()
                     }
 
-                    // TODO: Task 7 — collect soundEvent here and play audio
                     LaunchedEffect(vm.soundEvent) {
-                        vm.soundEvent.collect { /* placeholder */ }
+                        vm.soundEvent.collect { event ->
+                            soundPlayer.play(event)
+                        }
                     }
 
                     when (state.phase) {
