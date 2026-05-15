@@ -75,6 +75,8 @@ classDiagram
         class SettingsRepository {
             -prefs : SharedPreferences
             +targetCount : Int
+            +barcodeLength : Int
+            +barcodeHeader : String
         }
     }
 
@@ -89,14 +91,19 @@ classDiagram
             +logCount : StateFlow~Int~
             -_targetCount : MutableStateFlow~Int~
             +targetCount : StateFlow~Int~
+            -_barcodeLength : MutableStateFlow~Int~
+            +barcodeLength : StateFlow~Int~
+            -_barcodeHeader : MutableStateFlow~String~
+            +barcodeHeader : StateFlow~String~
             +onScanStart()
             +onBarcodeDetected(value : String?)
             +onConfirmFirst()
             +onCancel()
             +onRetry()
             +onPermissionDenied()
-            +onSetTargetCount(count : Int)
+            +onSaveSettings(targetCount : Int, barcodeLength : Int, barcodeHeader : String)
             +onClearLog()
+            -validateBarcode(value : String) String?
             -saveLog(barcode1 : String, barcode2 : String)
         }
 
@@ -141,11 +148,13 @@ classDiagram
             +permissionDenied : Boolean
             +logCount : Int
             +targetCount : Int
+            +barcodeLength : Int
+            +barcodeHeader : String
             +versionName : String
             +onScanStart : () -> Unit
             +onDownloadCsv : () -> Unit
             +onClearLog : () -> Unit
-            +onSetTargetCount : (Int) -> Unit
+            +onSaveSettings : (Int, Int, String) -> Unit
         }
 
         class ScanScreen {
@@ -257,14 +266,19 @@ classDiagram
         +logCount : StateFlow~Int~
         -_targetCount : MutableStateFlow~Int~
         +targetCount : StateFlow~Int~
+        -_barcodeLength : MutableStateFlow~Int~
+        +barcodeLength : StateFlow~Int~
+        -_barcodeHeader : MutableStateFlow~String~
+        +barcodeHeader : StateFlow~String~
         +onScanStart()
         +onBarcodeDetected(value : String?)
         +onConfirmFirst()
         +onCancel()
         +onRetry()
         +onPermissionDenied()
-        +onSetTargetCount(count : Int)
+        +onSaveSettings(targetCount : Int, barcodeLength : Int, barcodeHeader : String)
         +onClearLog()
+        -validateBarcode(value : String) String?
     }
 
     ScanState --> ScanPhase : phase
@@ -293,6 +307,8 @@ classDiagram
     class SettingsRepository {
         -prefs : SharedPreferences
         +targetCount : Int
+        +barcodeLength : Int
+        +barcodeHeader : String
     }
 
     class ScanLog {
@@ -304,8 +320,9 @@ classDiagram
     }
 
     class ScanViewModel {
-        +onSetTargetCount(count : Int)
+        +onSaveSettings(targetCount, barcodeLength, barcodeHeader)
         +onClearLog()
+        -validateBarcode(value) String?
         -saveLog(barcode1, barcode2)
     }
 
@@ -333,13 +350,13 @@ classDiagram
 | クラス | 種別 | 役割 |
 |--------|------|------|
 | `CsvLogRepository` | 通常クラス | OKログのCSV追記・重複チェック用バーコードセット管理・クリア |
-| `SettingsRepository` | 通常クラス | SharedPreferences で目標件数を永続化 |
+| `SettingsRepository` | 通常クラス | SharedPreferences で目標件数・バーコード長・ヘッダーを永続化 |
 
 ### ViewModel層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・重複判定・件数管理。logRepo/settingsRepo は省略可能（テスト時は null） |
+| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・バーコードバリデーション・重複判定・件数管理。logRepo/settingsRepo は省略可能（テスト時は null） |
 | `ScanViewModelFactory` | ViewModelProvider.Factory | logRepo・settingsRepo を ScanViewModel コンストラクタに渡す |
 
 ### Camera層
@@ -360,7 +377,7 @@ classDiagram
 | クラス | 種別 | 役割 |
 |--------|------|------|
 | `MainActivity` | ComponentActivity | ViewModel・FeedbackSoundPlayer・リポジトリを保持し、SoundEvent 観察・CSV 共有を担う |
-| `StartScreen` | Composable | スタート画面。進捗表示・読み込み数設定ダイアログ・ログメニュー・バージョン表示 |
+| `StartScreen` | Composable | スタート画面。進捗表示・設定ダイアログ（読み込み数・バーコード長・ヘッダー）・ログメニュー・バージョン表示 |
 | `ScanScreen` | Composable | 読み取り画面。CameraPreview を内包し、CONFIRMING_FIRST 時に確認UIを表示 |
 | `ResultScreen` | Composable | 判定画面。OK（青）/ NG（赤）/ 重複（橙）表示と進捗・完了メッセージ |
 | `CameraPreview` | Composable | CameraX のプレビューを AndroidView でラップして表示する |

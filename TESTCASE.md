@@ -112,12 +112,15 @@ stateDiagram-v2
 
 ---
 
-### 読み込み数設定
+### 読み込み数・バリデーション設定
 
 | ID | テスト名 | 前提条件 | 操作 | 期待結果 |
 |----|---------|---------|------|---------|
 | TC-VM-029 | 初期 targetCount は 0 | — | `ScanViewModel()` 生成 | `targetCount.value == 0` |
-| TC-VM-030 | onSetTargetCount() で targetCount が更新される | `targetCount=0` | `onSetTargetCount(100)` | `targetCount.value == 100` |
+| TC-VM-030 | onSaveSettings() で targetCount が更新される | `targetCount=0` | `onSaveSettings(100, 0, "")` | `targetCount.value == 100` |
+| TC-VM-031 | バーコード長不一致でフェーズ維持・エラー表示 | `barcodeLength=5`, `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("AB")` | `phase=WAITING_FOR_FIRST`, `errorMessage` に読んだ長さ（2）が含まれる |
+| TC-VM-032 | ヘッダー不一致でフェーズ維持・エラー表示 | `barcodeHeader="FOO"`, `phase=WAITING_FOR_FIRST` | `onBarcodeDetected("BARXYZ")` | `phase=WAITING_FOR_FIRST`, `errorMessage` が設定される |
+| TC-VM-033 | 長さ・ヘッダー一致でフェーズが進む | `barcodeLength=6`, `barcodeHeader="FOO"` | `onBarcodeDetected("FOOBAR")` | `phase=CONFIRMING_FIRST`, `errorMessage=null` |
 
 ---
 
@@ -158,6 +161,18 @@ class MainDispatcherRule(
     override fun starting(description: Description) { Dispatchers.setMain(testDispatcher) }
     override fun finished(description: Description) { Dispatchers.resetMain() }
 }
+```
+
+### バリデーション設定（TC-VM-031〜033）
+
+```kotlin
+val vm = ScanViewModel()
+vm.onSaveSettings(targetCount = 1, barcodeLength = 5, barcodeHeader = "FOO")
+runCurrent()
+vm.onScanStart(); runCurrent()
+vm.onBarcodeDetected("AB"); runCurrent()  // length=2, expected=5 → error
+assertNotNull(vm.state.value.errorMessage)
+assertTrue(vm.state.value.errorMessage!!.contains("2"))
 ```
 
 ### logRepo=null 時の挙動
@@ -201,6 +216,9 @@ job.cancel()
 | 重複時 重複（橙）表示・件数増やさない | 手動確認（logRepo=Context 依存） |
 | OKのみCSV保存・NGと重複は保存しない | 手動確認 |
 | 読み込み数設定・進捗 x/N 件表示 | TC-VM-029, TC-VM-030 + 手動確認 |
+| バーコード長不一致時のエラー表示 | TC-VM-031 |
+| ヘッダー不一致時のエラー表示 | TC-VM-032 |
+| 長さ・ヘッダー一致時に次フェーズへ進む | TC-VM-033 |
 | 目標完了でスタート無効・完了メッセージ | 手動確認 |
 | 読み取り時に音が鳴る | TC-VM-017〜TC-VM-019 |
 | 判定時に OK/NG 音が鳴る | TC-VM-018, TC-VM-019 |

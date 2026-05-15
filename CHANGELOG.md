@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.3.0] - 2026-05-16
+
+### Added
+- **バーコード長チェック**: 設定した長さと異なるバーコードを読んだ場合、「バーコード長が違います（読んだ長さ = x）」を表示しエラーとする。0 設定時は任意の長さを受け付ける
+- **ヘッダーチェック**: 設定した文字列で始まらないバーコードを読んだ場合、「ヘッダーが一致しません」を表示しエラーとする。空欄時はチェックなし
+
+### Changed
+- 「読み込み数（変更）」ボタンを「設定」ボタンに統合。ダイアログで「読み込み数」「バーコード長」「ヘッダー」の3項目を一括設定できるようにした
+- 読み込み数が未設定（0）のときはスタートボタンを無効化し、「読み込み数を設定してください」を赤字で表示する
+- SettingsRepository に barcodeLength・barcodeHeader を追加し SharedPreferences で永続化
+- ScanViewModel に onSaveSettings(targetCount, barcodeLength, barcodeHeader) を追加（onSetTargetCount を廃止）
+
+---
+
 ## [0.2.0] - 2026-05-16
 
 ### Added

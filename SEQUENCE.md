@@ -254,7 +254,46 @@ sequenceDiagram
 
 ---
 
-## シーケンス 8: 読み込み数完了フロー
+## シーケンス 8: バーコードバリデーションエラーフロー
+
+```mermaid
+sequenceDiagram
+    actor User as 作業者
+    participant UI as UI (Compose)
+    participant VM as ScanViewModel
+    participant Camera as CameraX
+    participant BA as BarcodeAnalyzer
+
+    Note over User,BA: 設定済み（バーコード長=5、ヘッダー="FOO"）
+
+    Camera->>BA: フレーム供給
+    BA-->>VM: onBarcodeDetected("AB")
+
+    VM->>VM: validateBarcode("AB")\n → length=2, expected=5
+    VM->>VM: errorMessage = "バーコード長が違います（読んだ長さ = 2）"\nphase 変更なし
+    VM-->>UI: state 更新
+    UI-->>User: エラーメッセージ表示（フェーズ維持）
+
+    Camera->>BA: フレーム供給
+    BA-->>VM: onBarcodeDetected("BARXY")
+
+    VM->>VM: validateBarcode("BARXY")\n → length=5 OK, header="FOO" 不一致
+    VM->>VM: errorMessage = "ヘッダーが一致しません"\nphase 変更なし
+    VM-->>UI: state 更新
+    UI-->>User: エラーメッセージ表示（フェーズ維持）
+
+    Camera->>BA: フレーム供給
+    BA-->>VM: onBarcodeDetected("FOOAB")
+
+    VM->>VM: validateBarcode("FOOAB")\n → length=5 OK, header OK
+    VM->>VM: barcode1 = "FOOAB"\nphase = CONFIRMING_FIRST\nerrorMessage = null
+    VM-->>UI: state 更新
+    UI-->>User: 確認画面へ進む
+```
+
+---
+
+## シーケンス 10: 読み込み数完了フロー
 
 ```mermaid
 sequenceDiagram
