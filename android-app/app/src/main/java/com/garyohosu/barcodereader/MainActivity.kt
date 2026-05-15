@@ -21,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.garyohosu.barcodereader.audio.FeedbackSoundPlayer
 import com.garyohosu.barcodereader.camera.BarcodeScannerController
 import com.garyohosu.barcodereader.data.CsvLogRepository
+import com.garyohosu.barcodereader.data.SettingsRepository
 import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
 import com.garyohosu.barcodereader.ui.CameraPreview
@@ -39,9 +40,13 @@ class MainActivity : ComponentActivity() {
             BarcodeReaderTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val logRepo = remember { CsvLogRepository(this@MainActivity) }
-                    val vm: ScanViewModel = viewModel(factory = ScanViewModelFactory(logRepo))
+                    val settingsRepo = remember { SettingsRepository(this@MainActivity) }
+                    val vm: ScanViewModel = viewModel(
+                        factory = ScanViewModelFactory(logRepo, settingsRepo)
+                    )
                     val state by vm.state.collectAsStateWithLifecycle()
                     val logCount by vm.logCount.collectAsStateWithLifecycle()
+                    val targetCount by vm.targetCount.collectAsStateWithLifecycle()
 
                     val controller = remember {
                         BarcodeScannerController(this@MainActivity) { value ->
@@ -70,9 +75,11 @@ class MainActivity : ComponentActivity() {
                         ScanPhase.IDLE -> StartScreen(
                             permissionDenied = state.permissionDenied,
                             logCount = logCount,
+                            targetCount = targetCount,
                             onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                             onDownloadCsv = { shareCsv(logRepo) },
-                            onClearLog = vm::onClearLog
+                            onClearLog = vm::onClearLog,
+                            onSetTargetCount = vm::onSetTargetCount
                         )
                         ScanPhase.WAITING_FOR_FIRST,
                         ScanPhase.CONFIRMING_FIRST,
@@ -88,6 +95,8 @@ class MainActivity : ComponentActivity() {
                             result = state.result ?: ScanResult.NG,
                             barcode1 = state.barcode1,
                             barcode2 = state.barcode2,
+                            scannedCount = logCount,
+                            targetCount = targetCount,
                             onRetry = vm::onRetry,
                             onCancel = vm::onCancel
                         )

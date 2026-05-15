@@ -7,6 +7,9 @@ import java.io.File
 class CsvLogRepository(context: Context) {
 
     private val file = File(context.filesDir, "scanlogs.csv")
+    private val barcodeSetFile = File(context.filesDir, "logged_barcodes.txt")
+
+    private val loggedBarcodes: MutableSet<String> = loadBarcodes()
 
     fun append(log: ScanLog) {
         if (!file.exists()) {
@@ -15,7 +18,11 @@ class CsvLogRepository(context: Context) {
         file.appendText(
             "${csv(log.datetime)},${csv(log.barcode1)},${csv(log.barcode2)},${csv(log.result)}\n"
         )
+        barcodeSetFile.appendText("${log.barcode1}\n")
+        loggedBarcodes.add(log.barcode1)
     }
+
+    fun isDuplicate(barcode: String): Boolean = barcode in loggedBarcodes
 
     fun getFile(): File = file
 
@@ -26,6 +33,13 @@ class CsvLogRepository(context: Context) {
 
     fun clear() {
         file.delete()
+        barcodeSetFile.delete()
+        loggedBarcodes.clear()
+    }
+
+    private fun loadBarcodes(): MutableSet<String> {
+        if (!barcodeSetFile.exists()) return mutableSetOf()
+        return barcodeSetFile.readLines().filter { it.isNotBlank() }.toMutableSet()
     }
 
     private fun csv(value: String) = "\"${value.replace("\"", "\"\"")}\""

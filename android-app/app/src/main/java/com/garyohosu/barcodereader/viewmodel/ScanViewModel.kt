@@ -3,6 +3,7 @@ package com.garyohosu.barcodereader.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.garyohosu.barcodereader.data.CsvLogRepository
+import com.garyohosu.barcodereader.data.SettingsRepository
 import com.garyohosu.barcodereader.domain.ScanLog
 import com.garyohosu.barcodereader.domain.ScanPhase
 import com.garyohosu.barcodereader.domain.ScanResult
@@ -22,7 +23,8 @@ import java.util.Locale
 private const val ERROR_EMPTY = "読み取りに失敗しました。もう一度バーコードをかざしてください。"
 
 class ScanViewModel(
-    private val logRepo: CsvLogRepository? = null
+    private val logRepo: CsvLogRepository? = null,
+    private val settingsRepo: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScanState())
@@ -33,6 +35,9 @@ class ScanViewModel(
 
     private val _logCount = MutableStateFlow(logRepo?.count() ?: 0)
     val logCount: StateFlow<Int> = _logCount.asStateFlow()
+
+    private val _targetCount = MutableStateFlow(settingsRepo?.targetCount ?: 0)
+    val targetCount: StateFlow<Int> = _targetCount.asStateFlow()
 
     fun onScanStart() {
         _state.value = ScanState(phase = ScanPhase.WAITING_FOR_FIRST)
@@ -57,16 +62,33 @@ class ScanViewModel(
                 emitSound(SoundEvent.BEEP)
             }
             ScanPhase.WAITING_FOR_SECOND -> {
-                val result = if (value == _state.value.barcode1) ScanResult.OK else ScanResult.NG
-                _state.value = _state.value.copy(
-                    barcode2 = value,
-                    result = result,
-                    phase = ScanPhase.RESULT,
-                    errorMessage = null
-                )
-                emitSound(SoundEvent.BEEP)
-                emitSound(if (result == ScanResult.OK) SoundEvent.OK else SoundEvent.NG)
-                saveLog(_state.value.barcode1 ?: "", value, result)
+                val barcode1 = _state.value.barcode1 ?: ""
+                if (value != barcode1) {
+                    _state.value = _state.value.copy(
+                        barcode2 = value,
+                        result = ScanResult.NG,
+                        phase = ScanPhase.RESULT,
+                        errorMessage = null
+                    )
+                    emitSound(SoundEvent.BEEP)
+                    emitSound(SoundEvent.NG)
+                } else {
+                    val isDuplicate = logRepo?.isDuplicate(value) == true
+                    val result = if (isDuplicate) ScanResult.DUPLICATE else ScanResult.OK
+                    _state.value = _state.value.copy(
+                        barcode2 = value,
+                        result = result,
+                        phase = ScanPhase.RESULT,
+                        errorMessage = null
+                    )
+                    emitSound(SoundEvent.BEEP)
+                    if (!isDuplicate) {
+                        emitSound(SoundEvent.OK)
+                        saveLog(barcode1, value)
+                    } else {
+                        emitSound(SoundEvent.NG)
+                    }
+                }
             }
             else -> Unit
         }
@@ -89,15 +111,20 @@ class ScanViewModel(
         _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE)
     }
 
+    fun onSetTargetCount(count: Int) {
+        settingsRepo?.targetCount = count
+        _targetCount.value = count
+    }
+
     fun onClearLog() {
         logRepo?.clear()
         _logCount.value = 0
     }
 
-    private fun saveLog(barcode1: String, barcode2: String, result: ScanResult) {
+    private fun saveLog(barcode1: String, barcode2: String) {
         logRepo ?: return
         val datetime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        logRepo.append(ScanLog(datetime, barcode1, barcode2, if (result == ScanResult.OK) "OK" else "NG"))
+        logRepo.append(ScanLog(datetime, barcode1, barcode2, "OK"))
         _logCount.value = logRepo.count()
     }
 

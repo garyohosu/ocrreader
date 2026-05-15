@@ -25,22 +25,33 @@ import com.garyohosu.barcodereader.domain.ScanResult
 
 private val OK_COLOR = Color(0xFF1565C0)
 private val NG_COLOR = Color(0xFFB71C1C)
+private val DUPLICATE_COLOR = Color(0xFFE65100)
 
 @Composable
 fun ResultScreen(
     result: ScanResult,
     barcode1: String?,
     barcode2: String?,
+    scannedCount: Int,
+    targetCount: Int,
     onRetry: () -> Unit,
     onCancel: () -> Unit
 ) {
-    // システムバックはスタート画面へ戻す（「もう一度」とは別動作）
+    val isComplete = targetCount > 0 && scannedCount >= targetCount
+
     BackHandler(onBack = onCancel)
 
-    val bgColor = if (result == ScanResult.OK) OK_COLOR else NG_COLOR
-    val resultText = if (result == ScanResult.OK) "OK" else "NG"
+    val bgColor = when (result) {
+        ScanResult.OK -> OK_COLOR
+        ScanResult.NG -> NG_COLOR
+        ScanResult.DUPLICATE -> DUPLICATE_COLOR
+    }
+    val resultText = when (result) {
+        ScanResult.OK -> "OK"
+        ScanResult.NG -> "NG"
+        ScanResult.DUPLICATE -> "重複"
+    }
 
-    // 背景色をシステムバー裏まで全面に敷き、コンテンツだけ safe area に収める
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -77,14 +88,41 @@ fun ResultScreen(
                 textAlign = TextAlign.Center
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            when {
+                result == ScanResult.OK && isComplete ->
+                    Text(
+                        text = "読み込み終わりました。\n新しい読み込み数を設定してください",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                result == ScanResult.OK && targetCount > 0 ->
+                    Text(
+                        text = "$scannedCount / $targetCount 件完了",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                result == ScanResult.DUPLICATE ->
+                    Text(
+                        text = "既に読み込み済みです",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                else -> {}
+            }
+
             Spacer(modifier = Modifier.height(48.dp))
 
             Button(
-                onClick = onRetry,
+                onClick = if (result == ScanResult.OK && isComplete) onCancel else onRetry,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White)
             ) {
                 Text(
-                    text = "もう一度",
+                    text = if (result == ScanResult.OK && isComplete) "スタート画面へ" else "もう一度",
                     color = bgColor
                 )
             }

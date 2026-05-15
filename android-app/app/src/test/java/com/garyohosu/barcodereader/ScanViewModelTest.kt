@@ -309,4 +309,19 @@ class ScanViewModelTest {
         vm.onConfirmFirst(); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
     }
+
+    // ── 読み込み数設定 ──────────────────────────────────────────
+
+    @Test
+    fun tc_vm_029_initialTargetCount_isZero() {
+        val vm = ScanViewModel()
+        assertEquals(0, vm.targetCount.value)
+    }
+
+    @Test
+    fun tc_vm_030_onSetTargetCount_updatesTargetCount() = runTest {
+        val vm = ScanViewModel()
+        vm.onSetTargetCount(100); runCurrent()
+        assertEquals(100, vm.targetCount.value)
+    }
 }
