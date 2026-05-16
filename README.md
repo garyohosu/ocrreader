@@ -8,7 +8,7 @@ Androidスマートフォンのカメラで2つのバーコードを連続読み
 
 | バージョン | ダウンロード |
 |-----------|------------|
-| v0.3.0 | 準備中 |
+| v0.3.0 | [app-debug.apk](https://github.com/garyohosu/barcodereader/releases/tag/v0.3.0) |
 | v0.1.0 | [barcodereader-v0.1.0-debug.apk](https://github.com/garyohosu/barcodereader/releases/tag/v0.1.0) |
 
 ---
