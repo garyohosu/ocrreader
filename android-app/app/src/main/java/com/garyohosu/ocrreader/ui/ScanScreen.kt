@@ -99,16 +99,26 @@ fun ScanScreen(
             Spacer(modifier = Modifier.height(8.dp))
         } else {
             Spacer(modifier = Modifier.height(16.dp))
+            if (!cameraReady) {
+                Text(
+                    text = "カメラを準備しています…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             Button(
-                onClick = onRead,
-                enabled = cameraReady
+                onClick = onRead
             ) {
-                Text(text = if (cameraReady) "読む" else "カメラ準備中")
+                Text(text = "読む")
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
         Text(
-            text = "文字にピントを合わせてからボタンを押してください",
+            text = "文字にピントを合わせてから『読む』を押してください",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier
