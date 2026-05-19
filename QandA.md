@@ -10,9 +10,9 @@
 
 ### Q1. クールダウン時間が spec と plan で食い違っている【重大度: 高】✅
 
-**回答:** 1秒に統一する。  
-spec.md §11 の「0.5秒〜1秒」は目安とし、実装値は「1秒固定」とする。  
-設定項目は設けない。
+**回答（更新）:** クールダウン方式を廃止。「読む」ボタン押下で OCR を1回だけ実行する方式に変更。  
+OCR は連続ループで動かさず、ボタン押下ごとに1フレームのみ解析して停止する。  
+クールダウン設定は不要。
 
 ---
 
@@ -277,11 +277,9 @@ Kotlin / Jetpack Compose / CameraX / ML Kit Ocr Scanning / Gradle Kotlin DSL で
 
 ### Q22. クールダウンのテスト方法【重大度: 中】✅
 
-**回答:** `MainDispatcherRule` + `StandardTestDispatcher` + `advanceTimeBy()` で確定。`ScanViewModel` にコンストラクタ引数でDispatcherを渡す設計は今回不要。
-
-- `Dispatchers.Main` を `StandardTestDispatcher` に差し替えることで `viewModelScope` 内の `delay(1000L)` を制御できる
-- `advanceTimeBy(1001L)` → `runCurrent()` でクールダウン終了を再現する
-- ViewModel 本体にテスト都合の引数を増やさない方がシンプルでよい
+**回答（更新）:** クールダウン方式を廃止したため、この問い自体が不要になった。  
+OCR は「読む」ボタン押下ごとに1回実行して完了するため、`delay()` に依存したテストは不要。  
+`MainDispatcherRule` + `runCurrent()` だけで全フェーズ遷移をテスト可能。
 
 ---
 
@@ -321,7 +319,7 @@ Kotlin / Jetpack Compose / CameraX / ML Kit Ocr Scanning / Gradle Kotlin DSL で
 | OCR認識 | ML Kit Ocr Scanning |
 | ビルド | Gradle Kotlin DSL |
 | 対応形式 | QR_CODE / CODE_39 / CODE_128 |
-| クールダウン | 1秒固定 |
+| クールダウン | なし（「読む」ボタン押下で1回のみOCR実行） |
 | OK表示色 | 青 |
 | NG表示色 | 赤 |
 | 音 | ToneGenerator（BEEP / ACK / NACK） |

@@ -22,6 +22,7 @@ sequenceDiagram
     actor User as 作業者
     participant UI as UI (Compose)
     participant VM as ScanViewModel
+    participant Controller as OcrScannerController
     participant Camera as CameraX
     participant BA as OcrAnalyzer
     participant Sound as FeedbackSoundPlayer
@@ -32,16 +33,19 @@ sequenceDiagram
     UI-->>User: スタート画面を表示（進捗 x/N 件・バージョン表示）
 
     User->>UI: スタートボタン押下
-    UI->>Camera: カメラ起動
-    Camera-->>UI: プレビュー開始
     UI->>VM: onScanStart()
     VM->>VM: phase = WAITING_FOR_FIRST
-    UI-->>User: 読み取り画面「1本目のOCRをかざしてください」
+    UI->>Controller: start()（カメラ起動・プレビューのみ）
+    Camera-->>UI: プレビュー開始
+    UI-->>User: 読み取り画面「1本目：文字にカメラを合わせて「読む」を押してください」\n「読む」ボタン表示
 
-    loop 1つ目検出待ち
-        Camera->>BA: フレーム供給
-        BA-->>VM: onOcrDetected(value)
-    end
+    User->>UI: カメラを文字に向けてピントを合わせる
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
+    Camera->>BA: フレーム供給
+    BA-->>VM: onDetected(value)
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: ocr1 = value\nphase = CONFIRMING_FIRST
     VM->>Sound: playBeep()
@@ -53,12 +57,15 @@ sequenceDiagram
     UI->>VM: onConfirmFirst()
     VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
-    UI-->>User: 「2本目のOCRをかざしてください」
+    UI-->>User: 「2本目：文字にカメラを合わせて「読む」を押してください」\n「読む」ボタン表示
 
-    loop 2つ目検出待ち
-        Camera->>BA: フレーム供給
-        BA-->>VM: onOcrDetected(value)
-    end
+    User->>UI: カメラを文字に向けてピントを合わせる
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
+    Camera->>BA: フレーム供給
+    BA-->>VM: onDetected(value)
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: ocr1 == ocr2
     VM->>Log: isDuplicate(ocr1)
@@ -174,20 +181,29 @@ sequenceDiagram
     actor User as 作業者
     participant UI as UI (Compose)
     participant VM as ScanViewModel
+    participant Controller as OcrScannerController
     participant Camera as CameraX
     participant BA as OcrAnalyzer
 
-    Note over User,BA: 読み取り画面（1本目 or 2本目 待ち）
+    Note over User,BA: 読み取り画面（1本目 or 2本目 待ち）・「読む」ボタン表示
 
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("") または null
+    BA-->>VM: onDetected("") または null
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: 空文字/null を破棄\nphase 変更なし\nerrorMessage を設定
     VM-->>UI: state 更新
-    UI-->>User: 「読み取りに失敗しました。もう一度OCRをかざしてください。」
+    UI-->>User: 「読み取りに失敗しました。もう一度OCRをかざしてください。」\n「読む」ボタン再表示
 
+    User->>UI: 「読む」ボタン押下（再試行）
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("123456")
+    BA-->>VM: onDetected("123456")
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: errorMessage = null（クリア）\nOCRを保存・次フェーズへ
     VM-->>UI: state 更新
@@ -216,7 +232,7 @@ sequenceDiagram
     UI->>VM: onCancel()
     VM->>VM: 全フィールドクリア\nphase = IDLE
     VM-->>UI: state 更新
-    UI->>Camera: カメラ停止
+    UI->>Controller: stop()（カメラ停止）
     UI-->>User: スタート画面へ遷移
 ```
 
@@ -229,26 +245,38 @@ sequenceDiagram
     actor User as 作業者
     participant UI as UI (Compose)
     participant VM as ScanViewModel
+    participant Controller as OcrScannerController
     participant Camera as CameraX
     participant BA as OcrAnalyzer
 
+    Note over User,BA: 読み取り画面（1本目待ち）・「読む」ボタン表示
+
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("123456")
+    BA-->>VM: onDetected("123456")
+    Controller->>Controller: ImageAnalysis アンバインド
+
     VM->>VM: ocr1 = "123456"\nphase = CONFIRMING_FIRST
     VM-->>UI: state 更新
 
-    Note over UI,User: カメラ映像 + ocr1 の値 + 「次へ」ボタンを表示
-
-    Note over Camera,BA: カメラフレームは引き続き供給されるが\nCONFIRMING_FIRST 中は VM が無視する
+    Note over UI,User: カメラ映像（プレビューのみ）+ ocr1 の値 + 「次へ」ボタンを表示
+    Note over Camera,BA: CONFIRMING_FIRST 中はプレビューのみ。「読む」ボタンなし
 
     User->>UI: 「次へ」ボタン押下
     UI->>VM: onConfirmFirst()
     VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
-    UI-->>User: 「2本目のOCRをかざしてください」
+    UI-->>User: 「2本目：文字にカメラを合わせて「読む」を押してください」\n「読む」ボタン表示
 
-    Camera->>BA: フレーム供給（2つ目のOCR）
-    BA-->>VM: onOcrDetected("789012")
+    User->>UI: 「読む」ボタン押下（2本目）
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
+    Camera->>BA: フレーム供給
+    BA-->>VM: onDetected("789012")
+    Controller->>Controller: ImageAnalysis アンバインド
+
     VM->>VM: ocr2 = "789012"\n照合へ進む
 ```
 
@@ -261,29 +289,42 @@ sequenceDiagram
     actor User as 作業者
     participant UI as UI (Compose)
     participant VM as ScanViewModel
+    participant Controller as OcrScannerController
     participant Camera as CameraX
     participant BA as OcrAnalyzer
 
-    Note over User,BA: 設定済み（OCR長=5、ヘッダー="FOO"）
+    Note over User,BA: 設定済み（OCR長=5、ヘッダー="FOO"）・「読む」ボタン表示
 
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("AB")
+    BA-->>VM: onDetected("AB")
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: validateOcr("AB")\n → length=2, expected=5
     VM->>VM: errorMessage = "OCR長が違います（読んだ長さ = 2）"\nphase 変更なし
     VM-->>UI: state 更新
-    UI-->>User: エラーメッセージ表示（フェーズ維持）
+    UI-->>User: エラーメッセージ表示（フェーズ維持）・「読む」ボタン再表示
 
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("BARXY")
+    BA-->>VM: onDetected("BARXY")
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: validateOcr("BARXY")\n → length=5 OK, header="FOO" 不一致
     VM->>VM: errorMessage = "ヘッダーが一致しません"\nphase 変更なし
     VM-->>UI: state 更新
-    UI-->>User: エラーメッセージ表示（フェーズ維持）
+    UI-->>User: エラーメッセージ表示（フェーズ維持）・「読む」ボタン再表示
 
+    User->>UI: 「読む」ボタン押下
+    UI->>Controller: requestRead()
+    Controller->>Camera: ImageAnalysis バインド（1回）
     Camera->>BA: フレーム供給
-    BA-->>VM: onOcrDetected("FOOAB")
+    BA-->>VM: onDetected("FOOAB")
+    Controller->>Controller: ImageAnalysis アンバインド
 
     VM->>VM: validateOcr("FOOAB")\n → length=5 OK, header OK
     VM->>VM: ocr1 = "FOOAB"\nphase = CONFIRMING_FIRST\nerrorMessage = null

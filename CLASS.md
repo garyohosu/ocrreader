@@ -96,7 +96,7 @@ classDiagram
             -_ocrHeader : MutableStateFlow~String~
             +ocrHeader : StateFlow~String~
             +onScanStart()
-            +onOcrDetected(value : String?)
+            +onDetected(value : String?)
             +onConfirmFirst()
             +onCancel()
             +onRetry()
@@ -121,10 +121,11 @@ classDiagram
         }
 
         class OcrScannerController {
-            -analyzer : OcrAnalyzer
             -cameraProvider : ProcessCameraProvider?
-            +startCamera(lifecycleOwner : LifecycleOwner, previewView : PreviewView)
-            +stopCamera()
+            -readRequested : Boolean
+            +start(lifecycleOwner : LifecycleOwner, surfaceProvider : Preview.SurfaceProvider)
+            +requestRead()
+            +stop()
         }
     }
 
@@ -164,6 +165,7 @@ classDiagram
             +errorMessage : String?
             +onCancel : () -> Unit
             +onConfirmFirst : () -> Unit
+            +onRead : () -> Unit
             +cameraContent : Composable
         }
 
@@ -197,7 +199,7 @@ classDiagram
 
     %% Camera層
     OcrScannerController *-- OcrAnalyzer : owns
-    OcrAnalyzer ..> ScanViewModel : onOcrDetected()
+    OcrAnalyzer ..> ScanViewModel : onDetected()
 
     %% Audio層
     MainActivity *-- FeedbackSoundPlayer : creates / releases
