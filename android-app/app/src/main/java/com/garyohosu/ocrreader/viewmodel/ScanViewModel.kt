@@ -121,7 +121,7 @@ class ScanViewModel(
     }
 
     fun onPermissionDenied() {
-        _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE, cameraReady = false)
+        _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE)
     }
 
     fun onSaveSettings(targetCount: Int, ocrLength: Int, ocrHeader: String) {
