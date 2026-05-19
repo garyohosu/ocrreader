@@ -1,4 +1,4 @@
-# CLASS.md — バーコード照合Androidアプリ クラス図
+# CLASS.md — OCR読取Androidアプリ クラス図
 
 ## レイヤー構成
 
@@ -7,7 +7,7 @@ UI層           MainActivity / StartScreen / ScanScreen / ResultScreen / CameraP
 ViewModel層    ScanViewModel
 Domain層       ScanState / ScanPhase / ScanResult / SoundEvent / ScanLog
 Data層         CsvLogRepository / SettingsRepository
-Camera層       BarcodeScannerController / BarcodeAnalyzer
+Camera層       OcrScannerController / OcrAnalyzer
 Audio層        FeedbackSoundPlayer
 ```
 
@@ -44,8 +44,8 @@ classDiagram
         class ScanState {
             <<data class>>
             +phase : ScanPhase
-            +barcode1 : String?
-            +barcode2 : String?
+            +ocr1 : String?
+            +ocr2 : String?
             +result : ScanResult?
             +errorMessage : String?
             +permissionDenied : Boolean
@@ -54,8 +54,8 @@ classDiagram
         class ScanLog {
             <<data class>>
             +datetime : String
-            +barcode1 : String
-            +barcode2 : String
+            +ocr1 : String
+            +ocr2 : String
             +result : String
         }
     }
@@ -63,10 +63,10 @@ classDiagram
     namespace data {
         class CsvLogRepository {
             -file : File
-            -barcodeSetFile : File
-            -loggedBarcodes : MutableSet~String~
+            -ocrSetFile : File
+            -loggedOcrs : MutableSet~String~
             +append(log : ScanLog)
-            +isDuplicate(barcode : String) Boolean
+            +isDuplicate(ocr : String) Boolean
             +getFile() File
             +count() Int
             +clear()
@@ -75,8 +75,8 @@ classDiagram
         class SettingsRepository {
             -prefs : SharedPreferences
             +targetCount : Int
-            +barcodeLength : Int
-            +barcodeHeader : String
+            +ocrLength : Int
+            +ocrHeader : String
         }
     }
 
@@ -91,20 +91,20 @@ classDiagram
             +logCount : StateFlow~Int~
             -_targetCount : MutableStateFlow~Int~
             +targetCount : StateFlow~Int~
-            -_barcodeLength : MutableStateFlow~Int~
-            +barcodeLength : StateFlow~Int~
-            -_barcodeHeader : MutableStateFlow~String~
-            +barcodeHeader : StateFlow~String~
+            -_ocrLength : MutableStateFlow~Int~
+            +ocrLength : StateFlow~Int~
+            -_ocrHeader : MutableStateFlow~String~
+            +ocrHeader : StateFlow~String~
             +onScanStart()
-            +onBarcodeDetected(value : String?)
+            +onOcrDetected(value : String?)
             +onConfirmFirst()
             +onCancel()
             +onRetry()
             +onPermissionDenied()
-            +onSaveSettings(targetCount : Int, barcodeLength : Int, barcodeHeader : String)
+            +onSaveSettings(targetCount : Int, ocrLength : Int, ocrHeader : String)
             +onClearLog()
-            -validateBarcode(value : String) String?
-            -saveLog(barcode1 : String, barcode2 : String)
+            -validateOcr(value : String) String?
+            -saveLog(ocr1 : String, ocr2 : String)
         }
 
         class ScanViewModelFactory {
@@ -114,14 +114,14 @@ classDiagram
     }
 
     namespace camera {
-        class BarcodeAnalyzer {
+        class OcrAnalyzer {
             <<ImageAnalysis.Analyzer>>
             -onDetected : (String?) -> Unit
             +analyze(image : ImageProxy)
         }
 
-        class BarcodeScannerController {
-            -analyzer : BarcodeAnalyzer
+        class OcrScannerController {
+            -analyzer : OcrAnalyzer
             -cameraProvider : ProcessCameraProvider?
             +startCamera(lifecycleOwner : LifecycleOwner, previewView : PreviewView)
             +stopCamera()
@@ -148,8 +148,8 @@ classDiagram
             +permissionDenied : Boolean
             +logCount : Int
             +targetCount : Int
-            +barcodeLength : Int
-            +barcodeHeader : String
+            +ocrLength : Int
+            +ocrHeader : String
             +versionName : String
             +onScanStart : () -> Unit
             +onDownloadCsv : () -> Unit
@@ -160,7 +160,7 @@ classDiagram
         class ScanScreen {
             <<Composable>>
             +phase : ScanPhase
-            +barcode1 : String?
+            +ocr1 : String?
             +errorMessage : String?
             +onCancel : () -> Unit
             +onConfirmFirst : () -> Unit
@@ -170,8 +170,8 @@ classDiagram
         class ResultScreen {
             <<Composable>>
             +result : ScanResult
-            +barcode1 : String?
-            +barcode2 : String?
+            +ocr1 : String?
+            +ocr2 : String?
             +scannedCount : Int
             +targetCount : Int
             +onRetry : () -> Unit
@@ -180,7 +180,7 @@ classDiagram
 
         class CameraPreview {
             <<Composable>>
-            +controller : BarcodeScannerController
+            +controller : OcrScannerController
         }
     }
 
@@ -196,8 +196,8 @@ classDiagram
     ScanViewModelFactory ..> ScanViewModel : creates
 
     %% Camera層
-    BarcodeScannerController *-- BarcodeAnalyzer : owns
-    BarcodeAnalyzer ..> ScanViewModel : onBarcodeDetected()
+    OcrScannerController *-- OcrAnalyzer : owns
+    OcrAnalyzer ..> ScanViewModel : onOcrDetected()
 
     %% Audio層
     MainActivity *-- FeedbackSoundPlayer : creates / releases
@@ -249,8 +249,8 @@ classDiagram
     class ScanState {
         <<data class>>
         +phase : ScanPhase
-        +barcode1 : String?
-        +barcode2 : String?
+        +ocr1 : String?
+        +ocr2 : String?
         +result : ScanResult?
         +errorMessage : String?
         +permissionDenied : Boolean
@@ -266,19 +266,19 @@ classDiagram
         +logCount : StateFlow~Int~
         -_targetCount : MutableStateFlow~Int~
         +targetCount : StateFlow~Int~
-        -_barcodeLength : MutableStateFlow~Int~
-        +barcodeLength : StateFlow~Int~
-        -_barcodeHeader : MutableStateFlow~String~
-        +barcodeHeader : StateFlow~String~
+        -_ocrLength : MutableStateFlow~Int~
+        +ocrLength : StateFlow~Int~
+        -_ocrHeader : MutableStateFlow~String~
+        +ocrHeader : StateFlow~String~
         +onScanStart()
-        +onBarcodeDetected(value : String?)
+        +onOcrDetected(value : String?)
         +onConfirmFirst()
         +onCancel()
         +onRetry()
         +onPermissionDenied()
-        +onSaveSettings(targetCount : Int, barcodeLength : Int, barcodeHeader : String)
+        +onSaveSettings(targetCount : Int, ocrLength : Int, ocrHeader : String)
         +onClearLog()
-        -validateBarcode(value : String) String?
+        -validateOcr(value : String) String?
     }
 
     ScanState --> ScanPhase : phase
@@ -295,10 +295,10 @@ classDiagram
 classDiagram
     class CsvLogRepository {
         -file : File (scanlogs.csv)
-        -barcodeSetFile : File (logged_barcodes.txt)
-        -loggedBarcodes : MutableSet~String~
+        -ocrSetFile : File (logged_ocrs.txt)
+        -loggedOcrs : MutableSet~String~
         +append(log : ScanLog)
-        +isDuplicate(barcode : String) Boolean
+        +isDuplicate(ocr : String) Boolean
         +getFile() File
         +count() Int
         +clear()
@@ -307,23 +307,23 @@ classDiagram
     class SettingsRepository {
         -prefs : SharedPreferences
         +targetCount : Int
-        +barcodeLength : Int
-        +barcodeHeader : String
+        +ocrLength : Int
+        +ocrHeader : String
     }
 
     class ScanLog {
         <<data class>>
         +datetime : String
-        +barcode1 : String
-        +barcode2 : String
+        +ocr1 : String
+        +ocr2 : String
         +result : String
     }
 
     class ScanViewModel {
-        +onSaveSettings(targetCount, barcodeLength, barcodeHeader)
+        +onSaveSettings(targetCount, ocrLength, ocrHeader)
         +onClearLog()
-        -validateBarcode(value) String?
-        -saveLog(barcode1, barcode2)
+        -validateOcr(value) String?
+        -saveLog(ocr1, ocr2)
     }
 
     ScanViewModel o-- CsvLogRepository : optional
@@ -349,22 +349,22 @@ classDiagram
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `CsvLogRepository` | 通常クラス | OKログのCSV追記・重複チェック用バーコードセット管理・クリア |
-| `SettingsRepository` | 通常クラス | SharedPreferences で目標件数・バーコード長・ヘッダーを永続化 |
+| `CsvLogRepository` | 通常クラス | OKログのCSV追記・重複チェック用OCRセット管理・クリア |
+| `SettingsRepository` | 通常クラス | SharedPreferences で目標件数・OCR長・ヘッダーを永続化 |
 
 ### ViewModel層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・バーコードバリデーション・重複判定・件数管理。logRepo/settingsRepo は省略可能（テスト時は null） |
+| `ScanViewModel` | ViewModel | 状態管理・照合ロジック・OCRバリデーション・重複判定・件数管理。logRepo/settingsRepo は省略可能（テスト時は null） |
 | `ScanViewModelFactory` | ViewModelProvider.Factory | logRepo・settingsRepo を ScanViewModel コンストラクタに渡す |
 
 ### Camera層
 
 | クラス | 種別 | 役割 |
 |--------|------|------|
-| `BarcodeAnalyzer` | ImageAnalysis.Analyzer | ML Kit で全フォーマットのバーコードを検出し、コールバックで ViewModel に通知する |
-| `BarcodeScannerController` | 通常クラス | CameraX の起動・停止と BarcodeAnalyzer のバインドを担う |
+| `OcrAnalyzer` | ImageAnalysis.Analyzer | ML Kit で全フォーマットのOCRを検出し、コールバックで ViewModel に通知する |
+| `OcrScannerController` | 通常クラス | CameraX の起動・停止と OcrAnalyzer のバインドを担う |
 
 ### Audio層
 
@@ -377,7 +377,7 @@ classDiagram
 | クラス | 種別 | 役割 |
 |--------|------|------|
 | `MainActivity` | ComponentActivity | ViewModel・FeedbackSoundPlayer・リポジトリを保持し、SoundEvent 観察・CSV 共有を担う |
-| `StartScreen` | Composable | スタート画面。進捗表示・設定ダイアログ（読み込み数・バーコード長・ヘッダー）・ログメニュー・バージョン表示 |
+| `StartScreen` | Composable | スタート画面。進捗表示・設定ダイアログ（読み込み数・OCR長・ヘッダー）・ログメニュー・バージョン表示 |
 | `ScanScreen` | Composable | 読み取り画面。CameraPreview を内包し、CONFIRMING_FIRST 時に確認UIを表示 |
 | `ResultScreen` | Composable | 判定画面。OK（青）/ NG（赤）/ 重複（橙）表示と進捗・完了メッセージ |
 | `CameraPreview` | Composable | CameraX のプレビューを AndroidView でラップして表示する |

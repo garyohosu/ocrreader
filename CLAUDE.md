@@ -16,7 +16,7 @@ gh workflow run build-apk.yml
 ```
 
 またはブラウザで Actions → "Build APK" → "Run workflow"。  
-ビルド完了後、Artifacts から `barcodereader-vX.X.X-debug.apk` をダウンロードできる。
+ビルド完了後、Artifacts から `ocrreader-vX.X.X-debug.apk` をダウンロードできる。
 
 #### 方法 B：タグを push してリリース（バージョンリリース時）
 
@@ -41,14 +41,14 @@ gh run download <run-id> --dir dist
 
 ### スマートフォンへの配布手順
 
-1. GitHub Release ページ（`https://github.com/garyohosu/barcodereader/releases`）をスマートフォンで開く
-2. `barcodereader-vX.X.X-debug.apk` をダウンロード
+1. GitHub Release ページ（`https://github.com/garyohosu/ocrreader/releases`）をスマートフォンで開く
+2. `ocrreader-vX.X.X-debug.apk` をダウンロード
 3. 初回のみ「提供元不明のアプリ」を許可してインストール
 
 既存リリースに APK を追加・更新したい場合：
 
 ```bash
-gh release upload v0.4.0 dist/barcodereader-v0.4.0-debug.apk --clobber
+gh release upload v0.4.0 dist/ocrreader-v0.4.0-debug.apk --clobber
 ```
 
 ---
@@ -73,4 +73,4 @@ gh release upload v0.4.0 dist/barcodereader-v0.4.0-debug.apk --clobber
   - Artifacts に 30 日間保存
   - タグ push 時は GitHub Release も自動作成
 - **背景**：PC に Android SDK / JDK がないため、ローカルビルドの代替としてCI ビルドを標準化
-- **動作確認**：手動実行で `barcodereader-v0.3.0-debug.apk`（33 MB）のビルドと配布を確認済み
+- **動作確認**：手動実行で `ocrreader-v0.3.0-debug.apk`（33 MB）のビルドと配布を確認済み

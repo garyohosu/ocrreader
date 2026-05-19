@@ -1,16 +1,17 @@
-package com.garyohosu.barcodereader.camera
+package com.garyohosu.ocrreader.camera
 
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 
-class BarcodeAnalyzer(
+class OcrAnalyzer(
     private val onDetected: (String?) -> Unit
 ) : ImageAnalysis.Analyzer {
 
-    private val scanner = BarcodeScanning.getClient()
+    private val recognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
 
     @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
@@ -21,14 +22,10 @@ class BarcodeAnalyzer(
         }
 
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                if (barcodes.isNotEmpty()) {
-                    // バーコードを検出したが rawValue が null/blank の場合も ViewModel に通知する
-                    onDetected(barcodes.first().rawValue)
-                }
-                // バーコードが1枚も検出されなかった場合は何もしない（次フレームを待つ）
+        recognizer.process(image)
+            .addOnSuccessListener { text ->
+                val detectedText = text.text.trim().takeIf { it.isNotEmpty() }
+                onDetected(detectedText)
             }
             .addOnFailureListener {
                 onDetected(null)

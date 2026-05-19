@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader
+package com.garyohosu.ocrreader
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

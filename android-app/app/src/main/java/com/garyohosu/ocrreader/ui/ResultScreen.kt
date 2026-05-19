@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader.ui
+package com.garyohosu.ocrreader.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.garyohosu.barcodereader.domain.ScanResult
+import com.garyohosu.ocrreader.domain.ScanResult
 
 private val OK_COLOR = Color(0xFF1565C0)
 private val NG_COLOR = Color(0xFFB71C1C)
@@ -30,8 +30,8 @@ private val DUPLICATE_COLOR = Color(0xFFE65100)
 @Composable
 fun ResultScreen(
     result: ScanResult,
-    barcode1: String?,
-    barcode2: String?,
+    ocr1: String?,
+    ocr2: String?,
     scannedCount: Int,
     targetCount: Int,
     onRetry: () -> Unit,
@@ -75,14 +75,14 @@ fun ResultScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "1本目: ${barcode1 ?: "—"}",
+                text = "1回目: ${ocr1 ?: "—"}",
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "2本目: ${barcode2 ?: "—"}",
+                text = "2回目: ${ocr2 ?: "—"}",
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
@@ -119,7 +119,7 @@ fun ResultScreen(
 
             val buttonText = when {
                 result == ScanResult.OK && isComplete -> "スタート画面へ"
-                result == ScanResult.OK -> "次のバーコードを読む"
+                result == ScanResult.OK -> "次のOCRを読む"
                 else -> "もう一度"
             }
             val buttonAction = if (result == ScanResult.OK && isComplete) onCancel else onRetry

@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader.ui
+package com.garyohosu.ocrreader.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -21,12 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.garyohosu.barcodereader.domain.ScanPhase
+import com.garyohosu.ocrreader.domain.ScanPhase
 
 @Composable
 fun ScanScreen(
     phase: ScanPhase,
-    barcode1: String?,
+    ocr1: String?,
     errorMessage: String?,
     onCancel: () -> Unit,
     onConfirmFirst: () -> Unit,
@@ -35,9 +35,9 @@ fun ScanScreen(
     BackHandler(onBack = onCancel)
 
     val phaseMessage = when (phase) {
-        ScanPhase.WAITING_FOR_FIRST -> "1本目のバーコードをかざしてください"
+        ScanPhase.WAITING_FOR_FIRST -> "1本目のOCRをかざしてください"
         ScanPhase.CONFIRMING_FIRST -> "1本目を確認してください"
-        ScanPhase.WAITING_FOR_SECOND -> "2本目のバーコードをかざしてください"
+        ScanPhase.WAITING_FOR_SECOND -> "2本目のOCRをかざしてください"
         else -> ""
     }
 
@@ -83,7 +83,7 @@ fun ScanScreen(
         if (phase == ScanPhase.CONFIRMING_FIRST) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = barcode1 ?: "",
+                text = ocr1 ?: "",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier

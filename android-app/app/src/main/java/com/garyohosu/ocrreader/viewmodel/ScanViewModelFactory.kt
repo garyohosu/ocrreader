@@ -1,9 +1,9 @@
-package com.garyohosu.barcodereader.viewmodel
+package com.garyohosu.ocrreader.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.garyohosu.barcodereader.data.CsvLogRepository
-import com.garyohosu.barcodereader.data.SettingsRepository
+import com.garyohosu.ocrreader.data.CsvLogRepository
+import com.garyohosu.ocrreader.data.SettingsRepository
 
 class ScanViewModelFactory(
     private val logRepo: CsvLogRepository,

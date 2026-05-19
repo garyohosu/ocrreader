@@ -1,19 +1,19 @@
-# バーコード照合Androidアプリ 実証実験 実装計画
+# OCR読取Androidアプリ 実証実験 実装計画
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Androidスマートフォンのカメラで2つのバーコードを連続読み取りし、一致/不一致を即時表示する実証実験用アプリを作る。
+**Goal:** Androidスマートフォンのカメラで2つのOCRを連続読み取りし、一致/不一致を即時表示する実証実験用アプリを作る。
 
-**Architecture:** 単一のAndroidアプリとして構成し、Kotlin + Gradle Kotlin DSL のAndroid Studioプロジェクトで実装する。UIはJetpack Compose、カメラはCameraX、バーコード認識は ML Kit Barcode Scanning を使う。画面状態はViewModelで管理し、1つ目の読み取り→2つ目の読み取り→判定表示の状態遷移を明確に分ける。音声フィードバックは Android 標準の ToneGenerator を使い、保存や通信は行わない。
+**Architecture:** 単一のAndroidアプリとして構成し、Kotlin + Gradle Kotlin DSL のAndroid Studioプロジェクトで実装する。UIはJetpack Compose、カメラはCameraX、OCR認識は ML Kit Ocr Scanning を使う。画面状態はViewModelで管理し、1つ目の読み取り→2つ目の読み取り→判定表示の状態遷移を明確に分ける。音声フィードバックは Android 標準の ToneGenerator を使い、保存や通信は行わない。
 
-**Tech Stack:** Kotlin, Android Studio, Gradle Kotlin DSL, Jetpack Compose, CameraX, ML Kit Barcode Scanning, ViewModel, Coroutines
+**Tech Stack:** Kotlin, Android Studio, Gradle Kotlin DSL, Jetpack Compose, CameraX, ML Kit Ocr Scanning, ViewModel, Coroutines
 
 ---
 
 ## 実装方針
 
 - 最初に最小のAndroid Studioプロジェクトを作る
-- 画面遷移より先に、**バーコード検出と2回照合の状態機械**を固める
+- 画面遷移より先に、**OCR検出と2回照合の状態機械**を固める
 - 読み取り成功音・OK音・NG音は ToneGenerator で実装する
 - 端末内のオフライン完結を最優先する
 - 保存やログインなどの機能は作らない
@@ -24,9 +24,9 @@
 - UI は Jetpack Compose
 - 画面はポートレート固定
 - カメラは CameraX
-- バーコード認識は ML Kit Barcode Scanning
+- OCR認識は ML Kit Ocr Scanning
 - ビルドは Gradle Kotlin DSL
-- 初期対応バーコード形式は QR_CODE / CODE_39 / CODE_128
+- 初期対応OCR形式は QR_CODE / CODE_39 / CODE_128
 - APK は debug APK でよい
 - 権限未許可なら要求を出し、拒否されたらスタート画面にエラーを出す
 - 読み取り後 1 秒はスキャン結果を無視する
@@ -38,8 +38,8 @@
 **Objective:** 実証実験用アプリの土台となるAndroid Studioプロジェクトを作る。
 
 **Files:**
-- Create: `project/barcodereader/android-app/`（新規Android Studioプロジェクト一式）
-- Modify: `project/barcodereader/README.md`
+- Create: `project/ocrreader/android-app/`（新規Android Studioプロジェクト一式）
+- Modify: `project/ocrreader/README.md`
 
 **Step 1: プロジェクトを作成する**
 
@@ -52,7 +52,7 @@
 
 Run:
 ```bash
-cd project/barcodereader/android-app
+cd project/ocrreader/android-app
 ./gradlew assembleDebug
 ```
 Expected: ビルド成功
@@ -82,9 +82,9 @@ Expected: アプリが起動し、スタート画面が表示される
 **Objective:** 1つ目読み取り→2つ目読み取り→判定表示の流れをアプリ内部で表現する。
 
 **Files:**
-- Create: `project/barcodereader/android-app/app/src/main/java/.../ScanState.kt`
-- Create: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
-- Test: `project/barcodereader/android-app/app/src/test/java/.../ScanViewModelTest.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../ScanState.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../ScanViewModel.kt`
+- Test: `project/ocrreader/android-app/app/src/test/java/.../ScanViewModelTest.kt`
 
 **Step 1: 失敗するテストを書く**
 
@@ -92,7 +92,7 @@ Expected: アプリが起動し、スタート画面が表示される
 @Test
 fun firstScan_movesToSecondScan() {
     val vm = ScanViewModel()
-    vm.onBarcodeDetected("123")
+    vm.onOcrDetected("123")
     assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
 }
 ```
@@ -127,15 +127,15 @@ Expected: PASS
 **Objective:** スタートボタンからカメラ画面へ遷移し、読み取り指示を表示する。
 
 **Files:**
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../MainActivity.kt`
-- Create: `project/barcodereader/android-app/app/src/main/java/.../ui/StartScreen.kt`
-- Create: `project/barcodereader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
-- Create: `project/barcodereader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../MainActivity.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../ui/StartScreen.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
 
 **Step 1: 画面ごとのComposableを作る**
 
 - StartScreen: アプリ名と「スタート」ボタン
-- ScanScreen: 「1つ目のバーコードを読んでください」「2つ目のバーコードを読んでください」
+- ScanScreen: 「1つ目のOCRを読んでください」「2つ目のOCRを読んでください」
 - ResultScreen: OK/NG表示と読み取った値
 
 **Step 2: 画面遷移を確認する**
@@ -158,9 +158,9 @@ Expected: ビルド成功
 **Objective:** Android端末のカメラ映像をアプリ内で表示できるようにする。
 
 **Files:**
-- Create: `project/barcodereader/android-app/app/src/main/java/.../camera/CameraPreview.kt`
-- Modify: `project/barcodereader/android-app/app/build.gradle.kts`
-- Modify: `project/barcodereader/android-app/app/src/main/AndroidManifest.xml`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../camera/CameraPreview.kt`
+- Modify: `project/ocrreader/android-app/app/build.gradle.kts`
+- Modify: `project/ocrreader/android-app/app/src/main/AndroidManifest.xml`
 
 **Step 1: 依存関係を追加する**
 
@@ -189,31 +189,31 @@ Expected:
 
 ---
 
-## Task 5: ML Kit でバーコード検出を組み込む
+## Task 5: ML Kit でOCR検出を組み込む
 
-**Objective:** カメラ映像からバーコード文字列を取得できるようにする。初期対応形式は QR_CODE / CODE_39 / CODE_128 に絞る。
+**Objective:** カメラ映像からOCR文字列を取得できるようにする。初期対応形式は QR_CODE / CODE_39 / CODE_128 に絞る。
 
 **Files:**
-- Create: `project/barcodereader/android-app/app/src/main/java/.../camera/BarcodeAnalyzer.kt`
-- Create: `project/barcodereader/android-app/app/src/main/java/.../camera/BarcodeScannerController.kt`
-- Modify: `project/barcodereader/android-app/app/build.gradle.kts`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../camera/OcrAnalyzer.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../camera/OcrScannerController.kt`
+- Modify: `project/ocrreader/android-app/app/build.gradle.kts`
 
 **Step 1: 失敗するテストまたは最小の検出データ変換テストを書く**
 
-- バーコード結果から文字列を安全に取り出す処理を単体テスト化する
+- OCR結果から文字列を安全に取り出す処理を単体テスト化する
 
 **Step 2: 検出コールバックを実装する**
 
-- 1件以上のバーコードを受け取る
+- 1件以上のOCRを受け取る
 - 空文字やnullを除外する
-- バーコード候補は検出されたが値が空文字 / null の場合は、保存せず `errorMessage` に失敗文言を設定する
+- OCR候補は検出されたが値が空文字 / null の場合は、保存せず `errorMessage` に失敗文言を設定する
 - 通常のカメラ待機状態で何も検出されていないフレームは失敗扱いにしない
 - 空文字 / null の場合は現在の読み取りフェーズを維持する
 - 空文字 / null の場合は読み取り成功音を鳴らさない
 - 先頭1件だけではなく、必要なら優先順位を持たせる
-- `Barcode.FORMAT_QR_CODE`
-- `Barcode.FORMAT_CODE_39`
-- `Barcode.FORMAT_CODE_128`
+- `Ocr.FORMAT_QR_CODE`
+- `Ocr.FORMAT_CODE_39`
+- `Ocr.FORMAT_CODE_128`
 
 **Step 3: ビルドして確認する**
 
@@ -227,12 +227,12 @@ Expected: PASS
 
 ## Task 6: 1つ目・2つ目の読み取りを連続処理する
 
-**Objective:** 1回目と2回目の読み取りを切り替え、同じバーコードの誤検出を抑える。
+**Objective:** 1回目と2回目の読み取りを切り替え、同じOCRの誤検出を抑える。
 
 **Files:**
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
-- Test: `project/barcodereader/android-app/app/src/test/java/.../ScanViewModelTest.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ScanViewModel.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
+- Test: `project/ocrreader/android-app/app/src/test/java/.../ScanViewModelTest.kt`
 
 **Step 1: 連続誤読を無視するテストを書く**
 
@@ -241,18 +241,18 @@ Expected: PASS
 fun duplicateScanWithinCooldown_isIgnored() { ... }
 ```
 
-- 空文字を渡しても `barcode1` / `barcode2` に保存されないこと
+- 空文字を渡しても `ocr1` / `ocr2` に保存されないこと
 - null 相当の入力でもフェーズが進まないこと
 - `errorMessage` が state に設定されること
 - 空文字 / null 時に音イベントが発火しないこと
-- 次に有効なバーコードを読めたら `errorMessage` がクリアされること
+- 次に有効なOCRを読めたら `errorMessage` がクリアされること
 
 **Step 2: クールダウンを実装する**
 
 - 読み取り後1秒は次の検出を無効化する
 - 1つ目→2つ目の同一連続誤読を防ぐ
 - 1つ目と2つ目の同じ値そのものは禁止しない
-- 有効なバーコードを読み取った時点で `errorMessage` をクリアする
+- 有効なOCRを読み取った時点で `errorMessage` をクリアする
 - `reset()`、中止、スタート画面へ戻る、フェーズ切替時にも `errorMessage` をクリアする
 
 **Step 3: テストを実行する**
@@ -270,8 +270,8 @@ Expected: PASS
 **Objective:** 操作結果を音で分かりやすく返す。音は ToneGenerator を使って実装する。
 
 **Files:**
-- Create: `project/barcodereader/android-app/app/src/main/java/.../audio/FeedbackSoundPlayer.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
+- Create: `project/ocrreader/android-app/app/src/main/java/.../audio/FeedbackSoundPlayer.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ScanViewModel.kt`
 
 **Step 1: 音の再生インターフェースを作る**
 
@@ -301,8 +301,8 @@ Expected:
 **Objective:** OK/NGを色と文字で直感的に伝える。
 
 **Files:**
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ScanViewModel.kt`
 
 **Step 1: OK/NG表示のテストを追加する**
 
@@ -327,14 +327,14 @@ Expected:
 **Objective:** 失敗時や再確認時にすぐ再試行できるようにする。
 
 **Files:**
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../MainActivity.kt`
-- Modify: `project/barcodereader/android-app/app/src/main/java/.../ScanViewModel.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ui/ResultScreen.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ui/ScanScreen.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../MainActivity.kt`
+- Modify: `project/ocrreader/android-app/app/src/main/java/.../ScanViewModel.kt`
 
 **Step 1: リセットテストを書く**
 
-- 判定結果、barcode1、barcode2がクリアされることを確認
+- 判定結果、ocr1、ocr2がクリアされることを確認
 - 読み取り画面の「中止」でスタート画面へ戻ることを確認
 - 読み取り画面でシステムバックを押しても Activity を終了せず、スタート画面へ戻ることを確認
 - 判定画面でシステムバックを押しても Activity を終了せず、スタート画面へ戻ることを確認
@@ -366,8 +366,8 @@ Expected:
 **Objective:** 実証実験で配布・確認しやすい形にまとめる。
 
 **Files:**
-- Create: `project/barcodereader/android-app/README.md`
-- Modify: `project/barcodereader/README.md`
+- Create: `project/ocrreader/android-app/README.md`
+- Modify: `project/ocrreader/README.md`
 
 **Step 1: READMEを書く**
 
@@ -399,15 +399,15 @@ Expected: `app-debug.apk` が生成される
 
 - AndroidスマートフォンにAPKでインストールできる
 - スタートボタンを押すとカメラが起動する
-- 1つ目のバーコードを読み取れる
-- 2つ目のバーコードを読み取れる
+- 1つ目のOCRを読み取れる
+- 2つ目のOCRを読み取れる
 - 読み取り画面で「中止」ボタンを押すとスタート画面へ戻れる
 - 読み取り画面でシステムバックを押してもスタート画面へ戻れる
-- 2つのバーコード文字列を画面に表示できる
+- 2つのOCR文字列を画面に表示できる
 - 一致時に青色でOK表示できる
 - 不一致時に赤色でNG表示できる
 - 空文字 / null 読み取り時は画面内メッセージを表示し、フェーズを進めない
-- 次に有効なバーコードを読めたら失敗メッセージが消える
+- 次に有効なOCRを読めたら失敗メッセージが消える
 - 読み取り時に音が鳴る
 - 判定時にOK音またはNG音が鳴る
 - 「もう一度」ボタンで再実行できる

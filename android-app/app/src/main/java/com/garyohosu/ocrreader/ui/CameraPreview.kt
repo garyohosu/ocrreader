@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader.ui
+package com.garyohosu.ocrreader.ui
 
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
@@ -6,11 +6,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.garyohosu.barcodereader.camera.BarcodeScannerController
+import com.garyohosu.ocrreader.camera.OcrScannerController
 
 @Composable
 fun CameraPreview(
-    controller: BarcodeScannerController,
+    controller: OcrScannerController,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current

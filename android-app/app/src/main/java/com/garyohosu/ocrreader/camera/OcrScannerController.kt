@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader.camera
+package com.garyohosu.ocrreader.camera
 
 import android.content.Context
 import androidx.camera.core.CameraSelector
@@ -9,7 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executors
 
-class BarcodeScannerController(
+class OcrScannerController(
     private val context: Context,
     private val onDetected: (String?) -> Unit
 ) {
@@ -36,7 +36,7 @@ class BarcodeScannerController(
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also {
-                it.setAnalyzer(analysisExecutor, BarcodeAnalyzer(onDetected))
+                it.setAnalyzer(analysisExecutor, OcrAnalyzer(onDetected))
             }
         try {
             cameraProvider?.unbindAll()

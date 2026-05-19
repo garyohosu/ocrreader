@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader
+package com.garyohosu.ocrreader
 
 import android.Manifest
 import android.content.Intent
@@ -18,26 +18,26 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.garyohosu.barcodereader.audio.FeedbackSoundPlayer
-import com.garyohosu.barcodereader.camera.BarcodeScannerController
-import com.garyohosu.barcodereader.data.CsvLogRepository
-import com.garyohosu.barcodereader.data.SettingsRepository
-import com.garyohosu.barcodereader.domain.ScanPhase
-import com.garyohosu.barcodereader.domain.ScanResult
-import com.garyohosu.barcodereader.ui.CameraPreview
-import com.garyohosu.barcodereader.ui.ResultScreen
-import com.garyohosu.barcodereader.ui.ScanScreen
-import com.garyohosu.barcodereader.ui.StartScreen
-import com.garyohosu.barcodereader.ui.theme.BarcodeReaderTheme
-import com.garyohosu.barcodereader.viewmodel.ScanViewModel
-import com.garyohosu.barcodereader.viewmodel.ScanViewModelFactory
+import com.garyohosu.ocrreader.audio.FeedbackSoundPlayer
+import com.garyohosu.ocrreader.camera.OcrScannerController
+import com.garyohosu.ocrreader.data.CsvLogRepository
+import com.garyohosu.ocrreader.data.SettingsRepository
+import com.garyohosu.ocrreader.domain.ScanPhase
+import com.garyohosu.ocrreader.domain.ScanResult
+import com.garyohosu.ocrreader.ui.CameraPreview
+import com.garyohosu.ocrreader.ui.ResultScreen
+import com.garyohosu.ocrreader.ui.ScanScreen
+import com.garyohosu.ocrreader.ui.StartScreen
+import com.garyohosu.ocrreader.ui.theme.OcrReaderTheme
+import com.garyohosu.ocrreader.viewmodel.ScanViewModel
+import com.garyohosu.ocrreader.viewmodel.ScanViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            BarcodeReaderTheme {
+            OcrReaderTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val logRepo = remember { CsvLogRepository(this@MainActivity) }
                     val settingsRepo = remember { SettingsRepository(this@MainActivity) }
@@ -47,12 +47,12 @@ class MainActivity : ComponentActivity() {
                     val state by vm.state.collectAsStateWithLifecycle()
                     val logCount by vm.logCount.collectAsStateWithLifecycle()
                     val targetCount by vm.targetCount.collectAsStateWithLifecycle()
-                    val barcodeLength by vm.barcodeLength.collectAsStateWithLifecycle()
-                    val barcodeHeader by vm.barcodeHeader.collectAsStateWithLifecycle()
+                    val ocrLength by vm.ocrLength.collectAsStateWithLifecycle()
+                    val ocrHeader by vm.ocrHeader.collectAsStateWithLifecycle()
 
                     val controller = remember {
-                        BarcodeScannerController(this@MainActivity) { value ->
-                            vm.onBarcodeDetected(value)
+                        OcrScannerController(this@MainActivity) { value ->
+                            vm.onDetected(value)
                         }
                     }
 
@@ -78,8 +78,8 @@ class MainActivity : ComponentActivity() {
                             permissionDenied = state.permissionDenied,
                             logCount = logCount,
                             targetCount = targetCount,
-                            barcodeLength = barcodeLength,
-                            barcodeHeader = barcodeHeader,
+                            ocrLength = ocrLength,
+                            ocrHeader = ocrHeader,
                             versionName = BuildConfig.VERSION_NAME,
                             onScanStart = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                             onDownloadCsv = { shareCsv(logRepo) },
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                         ScanPhase.CONFIRMING_FIRST,
                         ScanPhase.WAITING_FOR_SECOND -> ScanScreen(
                             phase = state.phase,
-                            barcode1 = state.barcode1,
+                            ocr1 = state.ocr1,
                             errorMessage = state.errorMessage,
                             onCancel = vm::onCancel,
                             onConfirmFirst = vm::onConfirmFirst,
@@ -98,8 +98,8 @@ class MainActivity : ComponentActivity() {
                         )
                         ScanPhase.RESULT -> ResultScreen(
                             result = state.result ?: ScanResult.NG,
-                            barcode1 = state.barcode1,
-                            barcode2 = state.barcode2,
+                            ocr1 = state.ocr1,
+                            ocr2 = state.ocr2,
                             scannedCount = logCount,
                             targetCount = targetCount,
                             onRetry = vm::onRetry,
@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/csv"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "バーコード照合ログ")
+            putExtra(Intent.EXTRA_SUBJECT, "OCR読取ログ")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, "CSVを共有"))

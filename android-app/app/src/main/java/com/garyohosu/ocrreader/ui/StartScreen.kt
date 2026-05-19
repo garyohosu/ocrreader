@@ -1,4 +1,4 @@
-package com.garyohosu.barcodereader.ui
+package com.garyohosu.ocrreader.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,13 +35,13 @@ fun StartScreen(
     permissionDenied: Boolean,
     logCount: Int,
     targetCount: Int,
-    barcodeLength: Int,
-    barcodeHeader: String,
+    ocrLength: Int,
+    ocrHeader: String,
     versionName: String,
     onScanStart: () -> Unit,
     onDownloadCsv: () -> Unit,
     onClearLog: () -> Unit,
-    onSaveSettings: (targetCount: Int, barcodeLength: Int, barcodeHeader: String) -> Unit
+    onSaveSettings: (targetCount: Int, ocrLength: Int, ocrHeader: String) -> Unit
 ) {
     val isComplete = targetCount > 0 && logCount >= targetCount
     val startEnabled = !permissionDenied && targetCount > 0 && !isComplete
@@ -81,14 +81,14 @@ fun StartScreen(
                     OutlinedTextField(
                         value = targetInput,
                         onValueChange = { targetInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("読み込み数（1以上）") },
+                        label = { Text("読み取り回数（1以上）") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = lengthInput,
                         onValueChange = { lengthInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("バーコード長（0で任意）") },
+                        label = { Text("OCR長（0で任意）") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
                     )
@@ -123,7 +123,7 @@ fun StartScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "バーコード照合",
+            text = "OCR読取",
             style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center
         )
@@ -144,14 +144,14 @@ fun StartScreen(
         when {
             targetCount == 0 ->
                 Text(
-                    text = "読み込み数を設定してください",
+                    text = "読み取り回数を設定してください",
                     color = Color(0xFFB00020),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
             isComplete ->
                 Text(
-                    text = "読み込み終わりました。\n新しい読み込み数を設定してください",
+                    text = "読み込み終わりました。\n新しい読み取り回数を設定してください",
                     color = Color(0xFF2E7D32),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
@@ -177,8 +177,8 @@ fun StartScreen(
 
         OutlinedButton(onClick = {
             targetInput = if (targetCount > 0) targetCount.toString() else ""
-            lengthInput = if (barcodeLength > 0) barcodeLength.toString() else ""
-            headerInput = barcodeHeader
+            lengthInput = if (ocrLength > 0) ocrLength.toString() else ""
+            headerInput = ocrHeader
             showSettingsDialog = true
         }) {
             Text(text = "設定")

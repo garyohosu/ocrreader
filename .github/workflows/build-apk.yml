@@ -39,9 +39,8 @@ jobs:
       - name: Rename APK
         run: |
           VERSION=$(grep 'versionName' android-app/app/build.gradle.kts | grep -oP '"\K[^"]+')
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk \
-             barcodereader-v${VERSION}-debug.apk
-          echo "APK_NAME=barcodereader-v${VERSION}-debug.apk" >> $GITHUB_ENV
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk              ocrreader-v${VERSION}-debug.apk
+          echo "APK_NAME=ocrreader-v${VERSION}-debug.apk" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Upload APK artifact

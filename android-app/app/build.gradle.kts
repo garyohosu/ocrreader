@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.garyohosu.barcodereader"
+    namespace = "com.garyohosu.ocrreader"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.garyohosu.barcodereader"
+        applicationId = "com.garyohosu.ocrreader"
         minSdk = 23
         targetSdk = 35
         versionCode = 3
@@ -58,7 +58,7 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
 
-    implementation(libs.mlkit.barcode)
+    implementation(libs.mlkit.text.japanese)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

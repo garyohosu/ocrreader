@@ -1,9 +1,9 @@
-package com.garyohosu.barcodereader
+package com.garyohosu.ocrreader
 
-import com.garyohosu.barcodereader.domain.ScanPhase
-import com.garyohosu.barcodereader.domain.ScanResult
-import com.garyohosu.barcodereader.domain.SoundEvent
-import com.garyohosu.barcodereader.viewmodel.ScanViewModel
+import com.garyohosu.ocrreader.domain.ScanPhase
+import com.garyohosu.ocrreader.domain.ScanResult
+import com.garyohosu.ocrreader.domain.SoundEvent
+import com.garyohosu.ocrreader.viewmodel.ScanViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -29,8 +29,8 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         val s = vm.state.value
         assertEquals(ScanPhase.IDLE, s.phase)
-        assertNull(s.barcode1)
-        assertNull(s.barcode2)
+        assertNull(s.ocr1)
+        assertNull(s.ocr2)
         assertNull(s.result)
         assertNull(s.errorMessage)
         assertFalse(s.permissionDenied)
@@ -47,11 +47,11 @@ class ScanViewModelTest {
     }
 
     @Test
-    fun tc_vm_003_firstValidScan_savesBarcode1AndMovesToConfirmingFirst() = runTest {
+    fun tc_vm_003_firstValidScan_savesOcr1AndMovesToConfirmingFirst() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        assertEquals("ABC", vm.state.value.barcode1)
+        vm.onOcrDetected("ABC"); runCurrent()
+        assertEquals("ABC", vm.state.value.ocr1)
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
     }
 
@@ -59,10 +59,10 @@ class ScanViewModelTest {
     fun tc_vm_004_secondValidScan_matchOk() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
-        assertEquals("ABC", vm.state.value.barcode2)
+        vm.onOcrDetected("ABC"); runCurrent()
+        assertEquals("ABC", vm.state.value.ocr2)
         assertEquals(ScanResult.OK, vm.state.value.result)
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
     }
@@ -71,10 +71,10 @@ class ScanViewModelTest {
     fun tc_vm_005_secondValidScan_mismatchNg() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("XYZ"); runCurrent()
-        assertEquals("XYZ", vm.state.value.barcode2)
+        vm.onOcrDetected("XYZ"); runCurrent()
+        assertEquals("XYZ", vm.state.value.ocr2)
         assertEquals(ScanResult.NG, vm.state.value.result)
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
     }
@@ -83,14 +83,14 @@ class ScanViewModelTest {
     fun tc_vm_006_onRetry_resetsToWaitingForFirst() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onRetry(); runCurrent()
         val s = vm.state.value
         assertEquals(ScanPhase.WAITING_FOR_FIRST, s.phase)
-        assertNull(s.barcode1)
-        assertNull(s.barcode2)
+        assertNull(s.ocr1)
+        assertNull(s.ocr2)
         assertNull(s.result)
     }
 
@@ -98,12 +98,12 @@ class ScanViewModelTest {
     fun tc_vm_007_onCancel_fromScan_resetsToIdle() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onCancel(); runCurrent()
         val s = vm.state.value
         assertEquals(ScanPhase.IDLE, s.phase)
-        assertNull(s.barcode1)
-        assertNull(s.barcode2)
+        assertNull(s.ocr1)
+        assertNull(s.ocr2)
         assertNull(s.errorMessage)
     }
 
@@ -111,9 +111,9 @@ class ScanViewModelTest {
     fun tc_vm_008_onCancel_fromResult_resetsToIdle() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("XYZ"); runCurrent()
+        vm.onOcrDetected("XYZ"); runCurrent()
         vm.onCancel(); runCurrent()
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
         assertNull(vm.state.value.result)
@@ -123,9 +123,9 @@ class ScanViewModelTest {
     fun tc_vm_011_sameValueTwice_isOk() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("SAME"); runCurrent()
+        vm.onOcrDetected("SAME"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("SAME"); runCurrent()
+        vm.onOcrDetected("SAME"); runCurrent()
         assertEquals(ScanResult.OK, vm.state.value.result)
     }
 
@@ -135,9 +135,9 @@ class ScanViewModelTest {
     fun tc_vm_012_nullScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected(null); runCurrent()
+        vm.onOcrDetected(null); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
-        assertNull(vm.state.value.barcode1)
+        assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
     }
 
@@ -145,9 +145,9 @@ class ScanViewModelTest {
     fun tc_vm_013_emptyStringScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected(""); runCurrent()
+        vm.onOcrDetected(""); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
-        assertNull(vm.state.value.barcode1)
+        assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
     }
 
@@ -155,9 +155,9 @@ class ScanViewModelTest {
     fun tc_vm_014_blankStringScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("   "); runCurrent()
+        vm.onOcrDetected("   "); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
-        assertNull(vm.state.value.barcode1)
+        assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
     }
 
@@ -165,11 +165,11 @@ class ScanViewModelTest {
     fun tc_vm_015_nullScanInSecondPhase_keepsPhase() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected(null); runCurrent()
+        vm.onOcrDetected(null); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
-        assertNull(vm.state.value.barcode2)
+        assertNull(vm.state.value.ocr2)
         assertNotNull(vm.state.value.errorMessage)
     }
 
@@ -177,9 +177,9 @@ class ScanViewModelTest {
     fun tc_vm_016_validScanAfterError_clearsErrorMessage() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected(null); runCurrent()
+        vm.onOcrDetected(null); runCurrent()
         assertNotNull(vm.state.value.errorMessage)
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertNull(vm.state.value.errorMessage)
     }
 
@@ -191,7 +191,7 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertTrue(SoundEvent.BEEP in events)
         job.cancel()
     }
@@ -202,9 +202,9 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
         job.cancel()
     }
@@ -215,9 +215,9 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("XYZ"); runCurrent()
+        vm.onOcrDetected("XYZ"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.NG), events)
         job.cancel()
     }
@@ -228,7 +228,7 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected(null); runCurrent()
+        vm.onOcrDetected(null); runCurrent()
         assertTrue(events.isEmpty())
         job.cancel()
     }
@@ -246,20 +246,20 @@ class ScanViewModelTest {
     @Test
     fun tc_vm_022_idleScan_isIgnored() = runTest {
         val vm = ScanViewModel()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
-        assertNull(vm.state.value.barcode1)
+        assertNull(vm.state.value.ocr1)
     }
 
     @Test
     fun tc_vm_023_resultScan_isIgnored() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
-        vm.onBarcodeDetected("NEW"); runCurrent()
+        vm.onOcrDetected("NEW"); runCurrent()
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
     }
 
@@ -296,7 +296,7 @@ class ScanViewModelTest {
     fun tc_vm_027_onConfirmFirst_movesToWaitingForSecond() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("ABC"); runCurrent()
+        vm.onOcrDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
         vm.onConfirmFirst(); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
@@ -310,7 +310,7 @@ class ScanViewModelTest {
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
     }
 
-    // ── 読み込み数設定 ──────────────────────────────────────────
+    // ── 読み取り数設定 ──────────────────────────────────────────
 
     @Test
     fun tc_vm_029_initialTargetCount_isZero() {
@@ -325,14 +325,14 @@ class ScanViewModelTest {
         assertEquals(100, vm.targetCount.value)
     }
 
-    // ── バーコードバリデーション ────────────────────────────────
+    // ── OCRバリデーション ────────────────────────────────
 
     @Test
     fun tc_vm_031_wrongLength_setsErrorAndKeepsPhase() = runTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 5, ""); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("AB"); runCurrent()
+        vm.onOcrDetected("AB"); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNotNull(vm.state.value.errorMessage)
         assertTrue(vm.state.value.errorMessage!!.contains("2"))
@@ -343,7 +343,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 0, "FOO"); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("BARXYZ"); runCurrent()
+        vm.onOcrDetected("BARXYZ"); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNotNull(vm.state.value.errorMessage)
     }
@@ -353,7 +353,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 6, "FOO"); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onBarcodeDetected("FOOBAR"); runCurrent()
+        vm.onOcrDetected("FOOBAR"); runCurrent()
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
         assertNull(vm.state.value.errorMessage)
     }

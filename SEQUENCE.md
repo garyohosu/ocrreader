@@ -1,4 +1,4 @@
-# SEQUENCE.md — バーコード照合Androidアプリ シーケンス図
+# SEQUENCE.md — OCR読取Androidアプリ シーケンス図
 
 ## 登場人物
 
@@ -8,7 +8,7 @@
 | UI | UI (Compose) | 画面描画・ユーザー操作受付 |
 | VM | ScanViewModel | 状態管理・照合ロジック |
 | Camera | CameraX | カメラプレビュー・フレーム供給 |
-| BA | BarcodeAnalyzer (ML Kit) | バーコード検出 |
+| BA | OcrAnalyzer (ML Kit) | OCR検出 |
 | Sound | FeedbackSoundPlayer | 音声フィードバック |
 | Log | CsvLogRepository | CSV保存・重複チェック |
 | OS | Android OS | 権限管理 |
@@ -23,7 +23,7 @@ sequenceDiagram
     participant UI as UI (Compose)
     participant VM as ScanViewModel
     participant Camera as CameraX
-    participant BA as BarcodeAnalyzer
+    participant BA as OcrAnalyzer
     participant Sound as FeedbackSoundPlayer
     participant Log as CsvLogRepository
 
@@ -36,41 +36,41 @@ sequenceDiagram
     Camera-->>UI: プレビュー開始
     UI->>VM: onScanStart()
     VM->>VM: phase = WAITING_FOR_FIRST
-    UI-->>User: 読み取り画面「1本目のバーコードをかざしてください」
+    UI-->>User: 読み取り画面「1本目のOCRをかざしてください」
 
     loop 1つ目検出待ち
         Camera->>BA: フレーム供給
-        BA-->>VM: onBarcodeDetected(value)
+        BA-->>VM: onOcrDetected(value)
     end
 
-    VM->>VM: barcode1 = value\nphase = CONFIRMING_FIRST
+    VM->>VM: ocr1 = value\nphase = CONFIRMING_FIRST
     VM->>Sound: playBeep()
     Sound-->>User: ピッ
     VM-->>UI: state 更新
-    UI-->>User: 「1本目を確認してください」\nbarcode1 の値と「次へ」ボタンを表示
+    UI-->>User: 「1本目を確認してください」\nocr1 の値と「次へ」ボタンを表示
 
     User->>UI: 「次へ」ボタン押下
     UI->>VM: onConfirmFirst()
     VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
-    UI-->>User: 「2本目のバーコードをかざしてください」
+    UI-->>User: 「2本目のOCRをかざしてください」
 
     loop 2つ目検出待ち
         Camera->>BA: フレーム供給
-        BA-->>VM: onBarcodeDetected(value)
+        BA-->>VM: onOcrDetected(value)
     end
 
-    VM->>VM: barcode1 == barcode2
-    VM->>Log: isDuplicate(barcode1)
+    VM->>VM: ocr1 == ocr2
+    VM->>Log: isDuplicate(ocr1)
     Log-->>VM: false（未登録）
     VM->>VM: result = OK\nphase = RESULT
     VM->>Sound: playBeep()
     VM->>Sound: playOk()
     Sound-->>User: ピッ → OK音
-    VM->>Log: append(datetime, barcode1, barcode2, "OK")
+    VM->>Log: append(datetime, ocr1, ocr2, "OK")
     VM->>VM: logCount++
     VM-->>UI: state 更新
-    UI-->>User: 判定画面（青・「OK」・x/N件完了・「次のバーコードを読む」）
+    UI-->>User: 判定画面（青・「OK」・x/N件完了・「次のOCRを読む」）
 ```
 
 ---
@@ -86,7 +86,7 @@ sequenceDiagram
 
     Note over User,Sound: 1つ目読み取り・確認（次へ）まではシーケンス1と同じ
 
-    VM->>VM: barcode1 != barcode2
+    VM->>VM: ocr1 != ocr2
     VM->>VM: result = NG\nphase = RESULT
     VM->>Sound: playBeep()
     VM->>Sound: playNg()
@@ -110,8 +110,8 @@ sequenceDiagram
 
     Note over User,Log: 1つ目読み取り・確認・2つ目読み取りまではシーケンス1と同じ
 
-    VM->>VM: barcode1 == barcode2
-    VM->>Log: isDuplicate(barcode1)
+    VM->>VM: ocr1 == ocr2
+    VM->>Log: isDuplicate(ocr1)
     Log-->>VM: true（既に登録済み）
     VM->>VM: result = DUPLICATE\nphase = RESULT
     VM->>Sound: playBeep()
@@ -175,21 +175,21 @@ sequenceDiagram
     participant UI as UI (Compose)
     participant VM as ScanViewModel
     participant Camera as CameraX
-    participant BA as BarcodeAnalyzer
+    participant BA as OcrAnalyzer
 
     Note over User,BA: 読み取り画面（1本目 or 2本目 待ち）
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("") または null
+    BA-->>VM: onOcrDetected("") または null
 
     VM->>VM: 空文字/null を破棄\nphase 変更なし\nerrorMessage を設定
     VM-->>UI: state 更新
-    UI-->>User: 「読み取りに失敗しました。もう一度バーコードをかざしてください。」
+    UI-->>User: 「読み取りに失敗しました。もう一度OCRをかざしてください。」
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("123456")
+    BA-->>VM: onOcrDetected("123456")
 
-    VM->>VM: errorMessage = null（クリア）\nバーコードを保存・次フェーズへ
+    VM->>VM: errorMessage = null（クリア）\nOCRを保存・次フェーズへ
     VM-->>UI: state 更新
     UI-->>User: エラーメッセージ消去・次フェーズへ進む
 ```
@@ -230,14 +230,14 @@ sequenceDiagram
     participant UI as UI (Compose)
     participant VM as ScanViewModel
     participant Camera as CameraX
-    participant BA as BarcodeAnalyzer
+    participant BA as OcrAnalyzer
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("123456")
-    VM->>VM: barcode1 = "123456"\nphase = CONFIRMING_FIRST
+    BA-->>VM: onOcrDetected("123456")
+    VM->>VM: ocr1 = "123456"\nphase = CONFIRMING_FIRST
     VM-->>UI: state 更新
 
-    Note over UI,User: カメラ映像 + barcode1 の値 + 「次へ」ボタンを表示
+    Note over UI,User: カメラ映像 + ocr1 の値 + 「次へ」ボタンを表示
 
     Note over Camera,BA: カメラフレームは引き続き供給されるが\nCONFIRMING_FIRST 中は VM が無視する
 
@@ -245,16 +245,16 @@ sequenceDiagram
     UI->>VM: onConfirmFirst()
     VM->>VM: phase = WAITING_FOR_SECOND
     VM-->>UI: state 更新
-    UI-->>User: 「2本目のバーコードをかざしてください」
+    UI-->>User: 「2本目のOCRをかざしてください」
 
-    Camera->>BA: フレーム供給（2つ目のバーコード）
-    BA-->>VM: onBarcodeDetected("789012")
-    VM->>VM: barcode2 = "789012"\n照合へ進む
+    Camera->>BA: フレーム供給（2つ目のOCR）
+    BA-->>VM: onOcrDetected("789012")
+    VM->>VM: ocr2 = "789012"\n照合へ進む
 ```
 
 ---
 
-## シーケンス 8: バーコードバリデーションエラーフロー
+## シーケンス 8: OCRバリデーションエラーフロー
 
 ```mermaid
 sequenceDiagram
@@ -262,31 +262,31 @@ sequenceDiagram
     participant UI as UI (Compose)
     participant VM as ScanViewModel
     participant Camera as CameraX
-    participant BA as BarcodeAnalyzer
+    participant BA as OcrAnalyzer
 
-    Note over User,BA: 設定済み（バーコード長=5、ヘッダー="FOO"）
+    Note over User,BA: 設定済み（OCR長=5、ヘッダー="FOO"）
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("AB")
+    BA-->>VM: onOcrDetected("AB")
 
-    VM->>VM: validateBarcode("AB")\n → length=2, expected=5
-    VM->>VM: errorMessage = "バーコード長が違います（読んだ長さ = 2）"\nphase 変更なし
+    VM->>VM: validateOcr("AB")\n → length=2, expected=5
+    VM->>VM: errorMessage = "OCR長が違います（読んだ長さ = 2）"\nphase 変更なし
     VM-->>UI: state 更新
     UI-->>User: エラーメッセージ表示（フェーズ維持）
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("BARXY")
+    BA-->>VM: onOcrDetected("BARXY")
 
-    VM->>VM: validateBarcode("BARXY")\n → length=5 OK, header="FOO" 不一致
+    VM->>VM: validateOcr("BARXY")\n → length=5 OK, header="FOO" 不一致
     VM->>VM: errorMessage = "ヘッダーが一致しません"\nphase 変更なし
     VM-->>UI: state 更新
     UI-->>User: エラーメッセージ表示（フェーズ維持）
 
     Camera->>BA: フレーム供給
-    BA-->>VM: onBarcodeDetected("FOOAB")
+    BA-->>VM: onOcrDetected("FOOAB")
 
-    VM->>VM: validateBarcode("FOOAB")\n → length=5 OK, header OK
-    VM->>VM: barcode1 = "FOOAB"\nphase = CONFIRMING_FIRST\nerrorMessage = null
+    VM->>VM: validateOcr("FOOAB")\n → length=5 OK, header OK
+    VM->>VM: ocr1 = "FOOAB"\nphase = CONFIRMING_FIRST\nerrorMessage = null
     VM-->>UI: state 更新
     UI-->>User: 確認画面へ進む
 ```

@@ -1,14 +1,14 @@
-package com.garyohosu.barcodereader.viewmodel
+package com.garyohosu.ocrreader.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.garyohosu.barcodereader.data.CsvLogRepository
-import com.garyohosu.barcodereader.data.SettingsRepository
-import com.garyohosu.barcodereader.domain.ScanLog
-import com.garyohosu.barcodereader.domain.ScanPhase
-import com.garyohosu.barcodereader.domain.ScanResult
-import com.garyohosu.barcodereader.domain.ScanState
-import com.garyohosu.barcodereader.domain.SoundEvent
+import com.garyohosu.ocrreader.data.CsvLogRepository
+import com.garyohosu.ocrreader.data.SettingsRepository
+import com.garyohosu.ocrreader.domain.ScanLog
+import com.garyohosu.ocrreader.domain.ScanPhase
+import com.garyohosu.ocrreader.domain.ScanResult
+import com.garyohosu.ocrreader.domain.ScanState
+import com.garyohosu.ocrreader.domain.SoundEvent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,7 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val ERROR_EMPTY = "読み取りに失敗しました。もう一度バーコードをかざしてください。"
+private const val ERROR_EMPTY = "OCR結果を取得できませんでした。もう一度カメラをかざしてください。"
 
 class ScanViewModel(
     private val logRepo: CsvLogRepository? = null,
@@ -39,26 +39,27 @@ class ScanViewModel(
     private val _targetCount = MutableStateFlow(settingsRepo?.targetCount ?: 0)
     val targetCount: StateFlow<Int> = _targetCount.asStateFlow()
 
-    private val _barcodeLength = MutableStateFlow(settingsRepo?.barcodeLength ?: 0)
-    val barcodeLength: StateFlow<Int> = _barcodeLength.asStateFlow()
+    private val _ocrLength = MutableStateFlow(settingsRepo?.ocrLength ?: 0)
+    val ocrLength: StateFlow<Int> = _ocrLength.asStateFlow()
 
-    private val _barcodeHeader = MutableStateFlow(settingsRepo?.barcodeHeader ?: "")
-    val barcodeHeader: StateFlow<String> = _barcodeHeader.asStateFlow()
+    private val _ocrHeader = MutableStateFlow(settingsRepo?.ocrHeader ?: "")
+    val ocrHeader: StateFlow<String> = _ocrHeader.asStateFlow()
 
     fun onScanStart() {
         _state.value = ScanState(phase = ScanPhase.WAITING_FOR_FIRST)
     }
 
-    fun onBarcodeDetected(value: String?) {
+    fun onDetected(value: String?) {
         val phase = _state.value.phase
         if (phase != ScanPhase.WAITING_FOR_FIRST && phase != ScanPhase.WAITING_FOR_SECOND) return
 
-        if (value.isNullOrBlank()) {
+        val normalized = normalize(value)
+        if (normalized.isNullOrBlank()) {
             _state.value = _state.value.copy(errorMessage = ERROR_EMPTY)
             return
         }
 
-        val validationError = validateBarcode(value)
+        val validationError = validateOcr(normalized)
         if (validationError != null) {
             _state.value = _state.value.copy(errorMessage = validationError)
             return
@@ -67,17 +68,17 @@ class ScanViewModel(
         when (phase) {
             ScanPhase.WAITING_FOR_FIRST -> {
                 _state.value = _state.value.copy(
-                    barcode1 = value,
+                    ocr1 = normalized,
                     phase = ScanPhase.CONFIRMING_FIRST,
                     errorMessage = null
                 )
                 emitSound(SoundEvent.BEEP)
             }
             ScanPhase.WAITING_FOR_SECOND -> {
-                val barcode1 = _state.value.barcode1 ?: ""
-                if (value != barcode1) {
+                val ocr1 = _state.value.ocr1 ?: ""
+                if (normalized != ocr1) {
                     _state.value = _state.value.copy(
-                        barcode2 = value,
+                        ocr2 = normalized,
                         result = ScanResult.NG,
                         phase = ScanPhase.RESULT,
                         errorMessage = null
@@ -85,10 +86,10 @@ class ScanViewModel(
                     emitSound(SoundEvent.BEEP)
                     emitSound(SoundEvent.NG)
                 } else {
-                    val isDuplicate = logRepo?.isDuplicate(value) == true
+                    val isDuplicate = logRepo?.isDuplicate(normalized) == true
                     val result = if (isDuplicate) ScanResult.DUPLICATE else ScanResult.OK
                     _state.value = _state.value.copy(
-                        barcode2 = value,
+                        ocr2 = normalized,
                         result = result,
                         phase = ScanPhase.RESULT,
                         errorMessage = null
@@ -96,7 +97,7 @@ class ScanViewModel(
                     emitSound(SoundEvent.BEEP)
                     if (!isDuplicate) {
                         emitSound(SoundEvent.OK)
-                        saveLog(barcode1, value)
+                        saveLog(ocr1, normalized)
                     } else {
                         emitSound(SoundEvent.NG)
                     }
@@ -123,13 +124,13 @@ class ScanViewModel(
         _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE)
     }
 
-    fun onSaveSettings(targetCount: Int, barcodeLength: Int, barcodeHeader: String) {
+    fun onSaveSettings(targetCount: Int, ocrLength: Int, ocrHeader: String) {
         settingsRepo?.targetCount = targetCount
-        settingsRepo?.barcodeLength = barcodeLength
-        settingsRepo?.barcodeHeader = barcodeHeader
+        settingsRepo?.ocrLength = ocrLength
+        settingsRepo?.ocrHeader = ocrHeader
         _targetCount.value = targetCount
-        _barcodeLength.value = barcodeLength
-        _barcodeHeader.value = barcodeHeader
+        _ocrLength.value = ocrLength
+        _ocrHeader.value = ocrHeader
     }
 
     fun onClearLog() {
@@ -137,22 +138,30 @@ class ScanViewModel(
         _logCount.value = 0
     }
 
-    private fun validateBarcode(value: String): String? {
-        val length = _barcodeLength.value
+    private fun validateOcr(value: String): String? {
+        val length = _ocrLength.value
         if (length > 0 && value.length != length) {
-            return "バーコード長が違います（読んだ長さ = ${value.length}）"
+            return "OCR文字数が違います（読み取った文字数 = ${value.length}）"
         }
-        val header = _barcodeHeader.value
+        val header = _ocrHeader.value
         if (header.isNotEmpty() && !value.startsWith(header)) {
-            return "ヘッダーが一致しません"
+            return "先頭文字列が一致しません"
         }
         return null
     }
 
-    private fun saveLog(barcode1: String, barcode2: String) {
+    private fun normalize(value: String?): String? {
+        return value
+            ?.replace('　', ' ')
+            ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun saveLog(ocr1: String, ocr2: String) {
         logRepo ?: return
         val datetime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        logRepo.append(ScanLog(datetime, barcode1, barcode2, "OK"))
+        logRepo.append(ScanLog(datetime, ocr1, ocr2, "OK"))
         _logCount.value = logRepo.count()
     }
 

@@ -1,8 +1,8 @@
-package com.garyohosu.barcodereader.audio
+package com.garyohosu.ocrreader.audio
 
 import android.media.AudioManager
 import android.media.ToneGenerator
-import com.garyohosu.barcodereader.domain.SoundEvent
+import com.garyohosu.ocrreader.domain.SoundEvent
 
 class FeedbackSoundPlayer {
 
