@@ -49,6 +49,12 @@ class ScanViewModel(
         _state.value = ScanState(phase = ScanPhase.WAITING_FOR_FIRST)
     }
 
+    fun onCameraReady() {
+        val phase = _state.value.phase
+        if (phase != ScanPhase.WAITING_FOR_FIRST && phase != ScanPhase.WAITING_FOR_SECOND) return
+        _state.value = _state.value.copy(cameraReady = true)
+    }
+
     fun onDetected(value: String?) {
         val phase = _state.value.phase
         if (phase != ScanPhase.WAITING_FOR_FIRST && phase != ScanPhase.WAITING_FOR_SECOND) return
@@ -109,7 +115,7 @@ class ScanViewModel(
 
     fun onConfirmFirst() {
         if (_state.value.phase != ScanPhase.CONFIRMING_FIRST) return
-        _state.value = _state.value.copy(phase = ScanPhase.WAITING_FOR_SECOND)
+        _state.value = _state.value.copy(phase = ScanPhase.WAITING_FOR_SECOND, cameraReady = false)
     }
 
     fun onCancel() {
@@ -121,7 +127,7 @@ class ScanViewModel(
     }
 
     fun onPermissionDenied() {
-        _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE)
+        _state.value = _state.value.copy(permissionDenied = true, phase = ScanPhase.IDLE, cameraReady = false)
     }
 
     fun onSaveSettings(targetCount: Int, ocrLength: Int, ocrHeader: String) {

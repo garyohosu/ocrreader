@@ -14,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,18 +89,26 @@ class MainActivity : ComponentActivity() {
                         )
                         ScanPhase.WAITING_FOR_FIRST,
                         ScanPhase.CONFIRMING_FIRST,
-                        ScanPhase.WAITING_FOR_SECOND -> ScanScreen(
-                            phase = state.phase,
-                            ocr1 = state.ocr1,
-                            errorMessage = state.errorMessage,
-                            onCancel = vm::onCancel,
-                            onConfirmFirst = {
-                                vm.onConfirmFirst()
-                                controller.requestRead()
-                            },
-                            onRead = { controller.requestRead() },
-                            cameraContent = { CameraPreview(controller = controller) }
-                        )
+                        ScanPhase.WAITING_FOR_SECOND -> {
+                            LaunchedEffect(state.phase) {
+                                if (state.phase == ScanPhase.WAITING_FOR_FIRST || state.phase == ScanPhase.WAITING_FOR_SECOND) {
+                                    delay(800)
+                                    vm.onCameraReady()
+                                }
+                            }
+                            ScanScreen(
+                                phase = state.phase,
+                                ocr1 = state.ocr1,
+                                errorMessage = state.errorMessage,
+                                cameraReady = state.cameraReady,
+                                onCancel = vm::onCancel,
+                                onConfirmFirst = {
+                                    vm.onConfirmFirst()
+                                },
+                                onRead = { controller.requestRead() },
+                                cameraContent = { CameraPreview(controller = controller) }
+                            )
+                        }
                         ScanPhase.RESULT -> ResultScreen(
                             result = state.result ?: ScanResult.NG,
                             ocr1 = state.ocr1,

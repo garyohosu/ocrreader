@@ -28,6 +28,7 @@ fun ScanScreen(
     phase: ScanPhase,
     ocr1: String?,
     errorMessage: String?,
+    cameraReady: Boolean,
     onCancel: () -> Unit,
     onConfirmFirst: () -> Unit,
     onRead: () -> Unit,
@@ -36,7 +37,7 @@ fun ScanScreen(
     BackHandler(onBack = onCancel)
 
     val phaseMessage = when (phase) {
-        ScanPhase.WAITING_FOR_FIRST -> "1本目のOCRをかざしてください"
+        ScanPhase.WAITING_FOR_FIRST -> "カメラが安定したら『読む』を押してください"
         ScanPhase.CONFIRMING_FIRST -> "1本目を確認してください"
         ScanPhase.WAITING_FOR_SECOND -> "2本目のOCRをかざしてください"
         else -> ""
@@ -98,11 +99,23 @@ fun ScanScreen(
             Spacer(modifier = Modifier.height(8.dp))
         } else {
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRead) {
-                Text(text = "読む")
+            Button(
+                onClick = onRead,
+                enabled = cameraReady
+            ) {
+                Text(text = if (cameraReady) "読む" else "カメラ準備中")
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+        Text(
+            text = "文字にピントを合わせてからボタンを押してください",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = onCancel,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF666666)),

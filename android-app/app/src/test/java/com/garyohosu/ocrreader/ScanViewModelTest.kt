@@ -34,6 +34,7 @@ class ScanViewModelTest {
         assertNull(s.result)
         assertNull(s.errorMessage)
         assertFalse(s.permissionDenied)
+        assertFalse(s.cameraReady)
     }
 
     // ── フェーズ遷移 ────────────────────────────────────────────
@@ -47,13 +48,37 @@ class ScanViewModelTest {
     }
 
     @Test
-    fun tc_vm_003_firstValidScan_savesOcr1AndMovesToConfirmingFirst() = runTest {
+    fun tc_vm_002b_onCameraReady_marksPreviewReady() = runTest {
         val vm = ScanViewModel()
-        vm.onScanStart(); runCurrent()
-        vm.onDetected("ABC"); runCurrent()
-        assertEquals("ABC", vm.state.value.ocr1)
-        assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
+        vm.onScanStart()
+        runCurrent()
+        assertFalse(vm.state.value.cameraReady)
+        vm.onCameraReady()
+        runCurrent()
+        assertTrue(vm.state.value.cameraReady)
     }
+
+    @Test
+    fun tc_vm_002c_onCameraReady_isIgnoredWhenIdle() = runTest {
+        val vm = ScanViewModel()
+        vm.onCameraReady()
+        runCurrent()
+        assertFalse(vm.state.value.cameraReady)
+    }
+
+    @Test
+    fun tc_vm_002d_onScanStart_resetsCameraReady() = runTest {
+        val vm = ScanViewModel()
+        vm.onScanStart()
+        runCurrent()
+        vm.onCameraReady()
+        runCurrent()
+        assertTrue(vm.state.value.cameraReady)
+        vm.onScanStart()
+        runCurrent()
+        assertFalse(vm.state.value.cameraReady)
+    }
+
 
     @Test
     fun tc_vm_004_secondValidScan_matchOk() = runTest {
@@ -270,6 +295,7 @@ class ScanViewModelTest {
         assertTrue(vm.state.value.permissionDenied)
         vm.onScanStart(); runCurrent()
         assertFalse(vm.state.value.permissionDenied)
+        assertFalse(vm.state.value.cameraReady)
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
     }
 
