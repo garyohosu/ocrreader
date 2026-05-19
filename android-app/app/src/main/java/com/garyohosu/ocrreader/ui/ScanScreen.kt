@@ -30,6 +30,7 @@ fun ScanScreen(
     errorMessage: String?,
     onCancel: () -> Unit,
     onConfirmFirst: () -> Unit,
+    onRead: () -> Unit,
     cameraContent: @Composable () -> Unit = {}
 ) {
     BackHandler(onBack = onCancel)
@@ -96,9 +97,12 @@ fun ScanScreen(
             }
             Spacer(modifier = Modifier.height(8.dp))
         } else {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onRead) {
+                Text(text = "読む")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-
         Button(
             onClick = onCancel,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF666666)),

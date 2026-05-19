@@ -50,7 +50,7 @@ class ScanViewModelTest {
     fun tc_vm_003_firstValidScan_savesOcr1AndMovesToConfirmingFirst() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals("ABC", vm.state.value.ocr1)
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
     }
@@ -59,9 +59,9 @@ class ScanViewModelTest {
     fun tc_vm_004_secondValidScan_matchOk() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals("ABC", vm.state.value.ocr2)
         assertEquals(ScanResult.OK, vm.state.value.result)
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
@@ -71,9 +71,9 @@ class ScanViewModelTest {
     fun tc_vm_005_secondValidScan_mismatchNg() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("XYZ"); runCurrent()
+        vm.onDetected("XYZ"); runCurrent()
         assertEquals("XYZ", vm.state.value.ocr2)
         assertEquals(ScanResult.NG, vm.state.value.result)
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
@@ -83,9 +83,9 @@ class ScanViewModelTest {
     fun tc_vm_006_onRetry_resetsToWaitingForFirst() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onRetry(); runCurrent()
         val s = vm.state.value
         assertEquals(ScanPhase.WAITING_FOR_FIRST, s.phase)
@@ -98,7 +98,7 @@ class ScanViewModelTest {
     fun tc_vm_007_onCancel_fromScan_resetsToIdle() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onCancel(); runCurrent()
         val s = vm.state.value
         assertEquals(ScanPhase.IDLE, s.phase)
@@ -111,9 +111,9 @@ class ScanViewModelTest {
     fun tc_vm_008_onCancel_fromResult_resetsToIdle() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("XYZ"); runCurrent()
+        vm.onDetected("XYZ"); runCurrent()
         vm.onCancel(); runCurrent()
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
         assertNull(vm.state.value.result)
@@ -123,9 +123,9 @@ class ScanViewModelTest {
     fun tc_vm_011_sameValueTwice_isOk() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("SAME"); runCurrent()
+        vm.onDetected("SAME"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("SAME"); runCurrent()
+        vm.onDetected("SAME"); runCurrent()
         assertEquals(ScanResult.OK, vm.state.value.result)
     }
 
@@ -135,7 +135,7 @@ class ScanViewModelTest {
     fun tc_vm_012_nullScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected(null); runCurrent()
+        vm.onDetected(null); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
@@ -145,7 +145,7 @@ class ScanViewModelTest {
     fun tc_vm_013_emptyStringScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected(""); runCurrent()
+        vm.onDetected(""); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
@@ -155,7 +155,7 @@ class ScanViewModelTest {
     fun tc_vm_014_blankStringScan_keepsPhaseAndSetsError() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("   "); runCurrent()
+        vm.onDetected("   "); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNull(vm.state.value.ocr1)
         assertNotNull(vm.state.value.errorMessage)
@@ -165,9 +165,9 @@ class ScanViewModelTest {
     fun tc_vm_015_nullScanInSecondPhase_keepsPhase() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected(null); runCurrent()
+        vm.onDetected(null); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
         assertNull(vm.state.value.ocr2)
         assertNotNull(vm.state.value.errorMessage)
@@ -177,9 +177,9 @@ class ScanViewModelTest {
     fun tc_vm_016_validScanAfterError_clearsErrorMessage() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected(null); runCurrent()
+        vm.onDetected(null); runCurrent()
         assertNotNull(vm.state.value.errorMessage)
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertNull(vm.state.value.errorMessage)
     }
 
@@ -191,7 +191,7 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertTrue(SoundEvent.BEEP in events)
         job.cancel()
     }
@@ -202,9 +202,9 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.OK), events)
         job.cancel()
     }
@@ -215,9 +215,9 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("XYZ"); runCurrent()
+        vm.onDetected("XYZ"); runCurrent()
         assertEquals(listOf(SoundEvent.BEEP, SoundEvent.BEEP, SoundEvent.NG), events)
         job.cancel()
     }
@@ -228,7 +228,7 @@ class ScanViewModelTest {
         val events = mutableListOf<SoundEvent>()
         val job = launch { vm.soundEvent.collect { events.add(it) } }
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected(null); runCurrent()
+        vm.onDetected(null); runCurrent()
         assertTrue(events.isEmpty())
         job.cancel()
     }
@@ -246,7 +246,7 @@ class ScanViewModelTest {
     @Test
     fun tc_vm_022_idleScan_isIgnored() = runTest {
         val vm = ScanViewModel()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.IDLE, vm.state.value.phase)
         assertNull(vm.state.value.ocr1)
     }
@@ -255,11 +255,11 @@ class ScanViewModelTest {
     fun tc_vm_023_resultScan_isIgnored() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         vm.onConfirmFirst(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
-        vm.onOcrDetected("NEW"); runCurrent()
+        vm.onDetected("NEW"); runCurrent()
         assertEquals(ScanPhase.RESULT, vm.state.value.phase)
     }
 
@@ -296,7 +296,7 @@ class ScanViewModelTest {
     fun tc_vm_027_onConfirmFirst_movesToWaitingForSecond() = runTest {
         val vm = ScanViewModel()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("ABC"); runCurrent()
+        vm.onDetected("ABC"); runCurrent()
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
         vm.onConfirmFirst(); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_SECOND, vm.state.value.phase)
@@ -332,7 +332,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 5, ""); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("AB"); runCurrent()
+        vm.onDetected("AB"); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNotNull(vm.state.value.errorMessage)
         assertTrue(vm.state.value.errorMessage!!.contains("2"))
@@ -343,7 +343,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 0, "FOO"); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("BARXYZ"); runCurrent()
+        vm.onDetected("BARXYZ"); runCurrent()
         assertEquals(ScanPhase.WAITING_FOR_FIRST, vm.state.value.phase)
         assertNotNull(vm.state.value.errorMessage)
     }
@@ -353,7 +353,7 @@ class ScanViewModelTest {
         val vm = ScanViewModel()
         vm.onSaveSettings(1, 6, "FOO"); runCurrent()
         vm.onScanStart(); runCurrent()
-        vm.onOcrDetected("FOOBAR"); runCurrent()
+        vm.onDetected("FOOBAR"); runCurrent()
         assertEquals(ScanPhase.CONFIRMING_FIRST, vm.state.value.phase)
         assertNull(vm.state.value.errorMessage)
     }

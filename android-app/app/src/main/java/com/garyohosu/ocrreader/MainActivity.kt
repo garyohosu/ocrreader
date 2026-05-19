@@ -93,7 +93,11 @@ class MainActivity : ComponentActivity() {
                             ocr1 = state.ocr1,
                             errorMessage = state.errorMessage,
                             onCancel = vm::onCancel,
-                            onConfirmFirst = vm::onConfirmFirst,
+                            onConfirmFirst = {
+                                vm.onConfirmFirst()
+                                controller.requestRead()
+                            },
+                            onRead = { controller.requestRead() },
                             cameraContent = { CameraPreview(controller = controller) }
                         )
                         ScanPhase.RESULT -> ResultScreen(
